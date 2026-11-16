@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Globe, LogOut } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import type { UserRole } from '../types/database';
 import { getLocalizedDisplayName, getLocalizedName, ROLE_LABELS } from '../utils/i18n';
+import { buildStaffAssignmentRows, validateRoleConfiguration } from '../utils/schoolRules';
 
 const ONBOARDABLE_ROLES: Exclude<UserRole, 'admin'>[] = [
   'teacher',
@@ -35,6 +36,18 @@ export const OnboardingWizard: React.FC = () => {
   const [selectedDivisionId, setSelectedDivisionId] = useState<string>(divisions[0]?.id || '');
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!primarySubjectId && subjects.length > 0) {
+      setPrimarySubjectId(subjects[0].id);
+    }
+  }, [primarySubjectId, subjects]);
+
+  useEffect(() => {
+    if (!selectedDivisionId && divisions.length > 0) {
+      setSelectedDivisionId(divisions[0].id);
+    }
+  }, [selectedDivisionId, divisions]);
 
   const groupedClasses = useMemo(() => {
     return grades
@@ -72,56 +85,57 @@ export const OnboardingWizard: React.FC = () => {
   const handleFinish = async () => {
     setErrorMsg(null);
 
-    if (selectedRole === 'teacher') {
-      if (!primarySubjectId) {
-        setErrorMsg(lang === 'ar' ? 'يرجى اختيار المادة الدراسية' : 'Please select your subject');
-        return;
-      }
-      if (selectedClassIds.length === 0) {
-        setErrorMsg(
-          lang === 'ar'
-            ? 'يرجى اختيار فصل واحد على الأقل'
-            : 'Please select at least one class section'
-        );
-        return;
-      }
-    } else if (selectedRole === 'supervisor') {
-      if (selectedClassIds.length === 0) {
-        setErrorMsg(
-          lang === 'ar'
-            ? 'يرجى اختيار الفصول التي تشرف عليها'
-            : 'Please select the class sections you supervise'
-        );
-        return;
-      }
-    } else if (!selectedDivisionId) {
-      setErrorMsg(lang === 'ar' ? 'يرجى اختيار المرحلة الدراسية' : 'Please select your division');
+    const validationError = validateRoleConfiguration({
+      roles: [selectedRole],
+      primarySubjectId,
+      divisionId: selectedDivisionId,
+      classSectionIds: selectedClassIds,
+      lang,
+    });
+    if (validationError) {
+      setErrorMsg(validationError);
       return;
     }
 
     setSaving(true);
     try {
-      if (selectedRole === 'teacher' || selectedRole === 'supervisor') {
-        const { error: delErr } = await supabase
+      const assignmentRows = buildStaffAssignmentRows({
+        userId: userProfile.id,
+        roles: [selectedRole],
+        classSectionIds: selectedClassIds,
+        primarySubjectId: selectedRole === 'teacher' ? primarySubjectId : null,
+      });
+
+      const { data: prevAssignments } = await supabase
+        .from('staff_class_assignments')
+        .select('user_id, class_section_id, subject_id, assignment_type')
+        .eq('user_id', userProfile.id);
+
+      const { error: delErr } = await supabase
+        .from('staff_class_assignments')
+        .delete()
+        .eq('user_id', userProfile.id);
+      if (delErr) {
+        setErrorMsg(delErr.message);
+        return;
+      }
+
+      if (assignmentRows.length > 0) {
+        const { data: insertedRows, error: assignErr } = await supabase
           .from('staff_class_assignments')
-          .delete()
-          .eq('user_id', userProfile.id);
-        if (delErr) {
-          setErrorMsg(delErr.message);
-          return;
-        }
-        const rows = selectedClassIds.map((class_section_id) => ({
-          user_id: userProfile.id,
-          class_section_id,
-          subject_id: selectedRole === 'teacher' ? primarySubjectId : null,
-          assignment_type: selectedRole as 'teacher' | 'supervisor',
-        }));
-        if (rows.length > 0) {
-          const { error: assignErr } = await supabase.from('staff_class_assignments').insert(rows);
-          if (assignErr) {
-            setErrorMsg(assignErr.message);
-            return;
+          .insert(assignmentRows)
+          .select('id');
+        if (assignErr || !insertedRows || insertedRows.length !== assignmentRows.length) {
+          if (prevAssignments && prevAssignments.length > 0) {
+            await supabase.from('staff_class_assignments').insert(prevAssignments);
           }
+          setErrorMsg(
+            assignErr?.message ||
+              (lang === 'ar'
+                ? 'تعذر حفظ الفصول المحددة، يرجى المحاولة مرة أخرى.'
+                : 'Could not verify saved class assignments. Please try again.')
+          );
+          return;
         }
       }
 
@@ -144,12 +158,16 @@ export const OnboardingWizard: React.FC = () => {
         .eq('id', userProfile.id);
 
       if (profErr) {
+        await supabase.from('staff_class_assignments').delete().eq('user_id', userProfile.id);
+        if (prevAssignments && prevAssignments.length > 0) {
+          await supabase.from('staff_class_assignments').insert(prevAssignments);
+        }
         setErrorMsg(profErr.message);
         return;
       }
 
-      await refreshCurrentProfile();
       await refreshMasterData();
+      await refreshCurrentProfile();
     } finally {
       setSaving(false);
     }
@@ -357,32 +375,57 @@ export const OnboardingWizard: React.FC = () => {
                     {selectedClassIds.length} {lang === 'ar' ? 'فصل' : 'selected'}
                   </span>
                 </div>
-                {groupedClasses.map(({ grade, items }) => (
-                  <div key={grade.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <p className="text-xs font-bold text-slate-800 mb-2">
-                      {getLocalizedName(grade, lang)}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {items.map((cs) => {
-                        const checked = selectedClassIds.includes(cs.id);
-                        return (
-                          <button
-                            key={cs.id}
-                            type="button"
-                            onClick={() => toggleClassId(cs.id)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                              checked
-                                ? 'bg-slate-900 text-white border-slate-900'
-                                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                            }`}
-                          >
-                            {getLocalizedDisplayName(cs, lang)}
-                          </button>
-                        );
-                      })}
+                {groupedClasses.map(({ grade, items }) => {
+                  const itemIds = items.map((i) => i.id);
+                  const allSelected = itemIds.every((id) => selectedClassIds.includes(id));
+                  return (
+                    <div key={grade.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-slate-800">
+                          {getLocalizedName(grade, lang)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedClassIds((prev) =>
+                              allSelected
+                                ? prev.filter((id) => !itemIds.includes(id))
+                                : Array.from(new Set([...prev, ...itemIds]))
+                            )
+                          }
+                          className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          {allSelected
+                            ? lang === 'ar'
+                              ? 'إلغاء الصف'
+                              : 'Clear Grade'
+                            : lang === 'ar'
+                              ? 'تحديد كل الصف'
+                              : 'Select All Grade'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {items.map((cs) => {
+                          const checked = selectedClassIds.includes(cs.id);
+                          return (
+                            <button
+                              key={cs.id}
+                              type="button"
+                              onClick={() => toggleClassId(cs.id)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                                checked
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                              }`}
+                            >
+                              {getLocalizedDisplayName(cs, lang)}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

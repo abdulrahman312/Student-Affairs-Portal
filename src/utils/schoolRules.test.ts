@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildStaffAssignmentRows,
   buildWhatsAppUrl,
   checkTimetableConflict,
   computeBehaviorWatchlist,
@@ -10,6 +11,7 @@ import {
   isAllowedSchoolEmail,
   isDateInRange,
   parseStudentExcelRows,
+  validateRoleConfiguration,
 } from './schoolRules';
 import type {
   BehaviorLog,
@@ -398,3 +400,107 @@ test('getRoleScope restricts teacher/supervisor strictly to assigned classes, pr
   });
   assert.deepEqual(scopedTeachers.map((t) => t.id), ['t1']);
 });
+
+test('buildStaffAssignmentRows guarantees non-null assignment_type across all roles and multi-role combos', () => {
+  const teacherRows = buildStaffAssignmentRows({
+    userId: 'u1',
+    roles: ['teacher'],
+    classSectionIds: ['cs-8c', 'cs-8e', 'cs-8c'],
+    primarySubjectId: 'sub-cs',
+  });
+  assert.equal(teacherRows.length, 2);
+  assert.deepEqual(teacherRows[0], {
+    user_id: 'u1',
+    class_section_id: 'cs-8c',
+    subject_id: 'sub-cs',
+    assignment_type: 'teacher',
+  });
+
+  const supRows = buildStaffAssignmentRows({
+    userId: 'u2',
+    roles: ['supervisor'],
+    classSectionIds: ['cs-4c'],
+    primarySubjectId: 'sub-cs',
+  });
+  assert.deepEqual(supRows, [
+    { user_id: 'u2', class_section_id: 'cs-4c', subject_id: null, assignment_type: 'supervisor' },
+  ]);
+
+  const multiRows = buildStaffAssignmentRows({
+    userId: 'u3',
+    roles: ['teacher', 'supervisor'],
+    classSectionIds: ['cs-8c'],
+    primarySubjectId: 'sub-cs',
+  });
+  assert.equal(multiRows.length, 2);
+  assert.equal(multiRows[0].assignment_type, 'teacher');
+  assert.equal(multiRows[1].assignment_type, 'supervisor');
+
+  const principalRows = buildStaffAssignmentRows({
+    userId: 'u4',
+    roles: ['principal', 'academic_supervisor'],
+    classSectionIds: ['cs-8c'],
+    primarySubjectId: null,
+  });
+  assert.deepEqual(principalRows, []);
+});
+
+test('validateRoleConfiguration validates role-specific requirements', () => {
+  assert.ok(
+    validateRoleConfiguration({
+      roles: ['teacher'],
+      primarySubjectId: '',
+      divisionId: '',
+      classSectionIds: ['cs-8c'],
+      lang: 'en',
+    })
+  );
+  assert.ok(
+    validateRoleConfiguration({
+      roles: ['teacher'],
+      primarySubjectId: 'sub-cs',
+      divisionId: '',
+      classSectionIds: [],
+      lang: 'en',
+    })
+  );
+  assert.equal(
+    validateRoleConfiguration({
+      roles: ['teacher'],
+      primarySubjectId: 'sub-cs',
+      divisionId: '',
+      classSectionIds: ['cs-8c', 'cs-8e', 'cs-8j'],
+      lang: 'en',
+    }),
+    null
+  );
+  assert.ok(
+    validateRoleConfiguration({
+      roles: ['supervisor'],
+      primarySubjectId: '',
+      divisionId: '',
+      classSectionIds: [],
+      lang: 'en',
+    })
+  );
+  assert.ok(
+    validateRoleConfiguration({
+      roles: ['principal'],
+      primarySubjectId: '',
+      divisionId: '',
+      classSectionIds: [],
+      lang: 'en',
+    })
+  );
+  assert.equal(
+    validateRoleConfiguration({
+      roles: ['academic_supervisor'],
+      primarySubjectId: '',
+      divisionId: 'div-up',
+      classSectionIds: [],
+      lang: 'en',
+    }),
+    null
+  );
+});
+

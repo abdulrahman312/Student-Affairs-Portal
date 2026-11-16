@@ -18,7 +18,12 @@ import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import type { Profile, Student, UserRole } from '../types/database';
 import { getLocalizedDisplayName, getLocalizedName, ROLE_LABELS, tr } from '../utils/i18n';
-import { parseStudentExcelRows, type ParsedStudentRow } from '../utils/schoolRules';
+import {
+  buildStaffAssignmentRows,
+  parseStudentExcelRows,
+  validateRoleConfiguration,
+  type ParsedStudentRow,
+} from '../utils/schoolRules';
 import { TimetableSubstitutionModule } from './TimetableSubstitutionModule';
 import { NoticeBoardManager } from './NoticeBoardSection';
 
@@ -88,6 +93,9 @@ export const AdminSuite: React.FC = () => {
     null
   );
   const [editUserError, setEditUserError] = useState<string | null>(null);
+  const [editUserSaving, setEditUserSaving] = useState(false);
+  const [dummyError, setDummyError] = useState<string | null>(null);
+  const [dummySaving, setDummySaving] = useState(false);
   const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
   const [deletingUserLoading, setDeletingUserLoading] = useState(false);
 
@@ -111,122 +119,192 @@ export const AdminSuite: React.FC = () => {
     setEditUserSubject(p.primary_subject_id || '');
     setEditUserDivision(p.division_id || '');
     setEditUserClasses(
-      staffAssignments.filter((a) => a.user_id === p.id).map((a) => a.class_section_id)
+      Array.from(
+        new Set(staffAssignments.filter((a) => a.user_id === p.id).map((a) => a.class_section_id))
+      )
     );
   };
 
-  const resolveAssignmentType = (roles: UserRole[]): 'teacher' | 'supervisor' =>
-    roles.includes('supervisor') && !roles.includes('teacher') ? 'supervisor' : 'teacher';
-
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingUser || editUserRoles.length === 0) return;
+    if (!editingUser) return;
     setEditUserError(null);
-    const nextActiveRole = editUserRoles.includes(editingUser.active_role)
-      ? editingUser.active_role
-      : editUserRoles[0];
 
-    const { error: profErr } = await supabase
-      .from('profiles')
-      .update({
-        name_ar: editUserNameAr.trim(),
-        name_en: editUserNameEn.trim(),
+    const validationError = validateRoleConfiguration({
+      roles: editUserRoles,
+      primarySubjectId: editUserSubject,
+      divisionId: editUserDivision,
+      classSectionIds: editUserClasses,
+      lang,
+    });
+    if (validationError) {
+      setEditUserError(validationError);
+      return;
+    }
+
+    setEditUserSaving(true);
+    try {
+      const nextActiveRole = editUserRoles.includes(editingUser.active_role)
+        ? editingUser.active_role
+        : editUserRoles[0];
+      const normalizedSubjectId = editUserRoles.includes('teacher')
+        ? editUserSubject || null
+        : null;
+      const assignmentRows = buildStaffAssignmentRows({
+        userId: editingUser.id,
         roles: editUserRoles,
-        active_role: nextActiveRole,
-        primary_subject_id: editUserSubject || null,
-        division_id: editUserDivision || null,
-        is_onboarded: true,
-      })
-      .eq('id', editingUser.id);
+        classSectionIds: editUserClasses,
+        primarySubjectId: normalizedSubjectId,
+      });
 
-    if (profErr) {
-      setEditUserError(profErr.message);
-      return;
-    }
+      const { data: prevAssignments } = await supabase
+        .from('staff_class_assignments')
+        .select('user_id, class_section_id, subject_id, assignment_type')
+        .eq('user_id', editingUser.id);
 
-    const { error: delErr } = await supabase
-      .from('staff_class_assignments')
-      .delete()
-      .eq('user_id', editingUser.id);
-    if (delErr) {
-      setEditUserError(delErr.message);
-      return;
-    }
-
-    if (editUserClasses.length > 0) {
-      const assignmentType = resolveAssignmentType(editUserRoles);
-      const { error: assignErr } = await supabase.from('staff_class_assignments').insert(
-        editUserClasses.map((csId) => ({
-          user_id: editingUser.id,
-          class_section_id: csId,
-          subject_id: assignmentType === 'teacher' ? editUserSubject || null : null,
-          assignment_type: assignmentType,
-        }))
-      );
-      if (assignErr) {
-        setEditUserError(assignErr.message);
+      const { error: delErr } = await supabase
+        .from('staff_class_assignments')
+        .delete()
+        .eq('user_id', editingUser.id);
+      if (delErr) {
+        setEditUserError(delErr.message);
         return;
       }
-    }
 
-    setEditingUser(null);
-    await refreshMasterData();
+      if (assignmentRows.length > 0) {
+        const { data: insertedRows, error: assignErr } = await supabase
+          .from('staff_class_assignments')
+          .insert(assignmentRows)
+          .select('id');
+        if (assignErr || !insertedRows || insertedRows.length !== assignmentRows.length) {
+          if (prevAssignments && prevAssignments.length > 0) {
+            await supabase.from('staff_class_assignments').insert(prevAssignments);
+          }
+          setEditUserError(
+            assignErr?.message ||
+              (lang === 'ar'
+                ? 'تعذر حفظ الفصول المسندة، يرجى المحاولة مرة أخرى.'
+                : 'Failed to save assigned class sections.')
+          );
+          return;
+        }
+      }
+
+      const { error: profErr } = await supabase
+        .from('profiles')
+        .update({
+          name_ar: editUserNameAr.trim(),
+          name_en: editUserNameEn.trim(),
+          roles: editUserRoles,
+          active_role: nextActiveRole,
+          primary_subject_id: normalizedSubjectId,
+          division_id: editUserDivision || null,
+          is_onboarded: true,
+        })
+        .eq('id', editingUser.id);
+
+      if (profErr) {
+        await supabase.from('staff_class_assignments').delete().eq('user_id', editingUser.id);
+        if (prevAssignments && prevAssignments.length > 0) {
+          await supabase.from('staff_class_assignments').insert(prevAssignments);
+        }
+        setEditUserError(profErr.message);
+        return;
+      }
+
+      setEditingUser(null);
+      await refreshMasterData();
+    } finally {
+      setEditUserSaving(false);
+    }
   };
 
   const handleCreateDummy = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserActionMsg(null);
-    if (!dummyEmail.trim() || !dummyPassword.trim() || dummyRoles.length === 0) return;
-
-    const newId = crypto.randomUUID();
-    const { error } = await supabase.from('profiles').insert({
-      id: newId,
-      email: dummyEmail.trim().toLowerCase(),
-      name_ar: dummyNameAr.trim() || dummyNameEn.trim(),
-      name_en: dummyNameEn.trim() || dummyNameAr.trim(),
-      roles: dummyRoles,
-      active_role: dummyRoles[0],
-      primary_subject_id: dummySubject || null,
-      division_id: dummyDivision || null,
-      is_onboarded: true,
-      is_dummy: true,
-      dummy_password: dummyPassword,
-    });
-
-    if (error) {
-      setUserActionMsg({ type: 'err', text: error.message });
+    setDummyError(null);
+    if (!dummyEmail.trim() || !dummyPassword.trim()) {
+      setDummyError(
+        lang === 'ar' ? 'يرجى إدخال البريد وكلمة المرور' : 'Please enter email and password'
+      );
       return;
     }
 
-    if (dummyClasses.length > 0) {
-      const assignmentType = resolveAssignmentType(dummyRoles);
-      const { error: assignErr } = await supabase.from('staff_class_assignments').insert(
-        dummyClasses.map((csId) => ({
-          user_id: newId,
-          class_section_id: csId,
-          subject_id: assignmentType === 'teacher' ? dummySubject || null : null,
-          assignment_type: assignmentType,
-        }))
-      );
-      if (assignErr) {
-        setUserActionMsg({ type: 'err', text: assignErr.message });
-        return;
-      }
+    const validationError = validateRoleConfiguration({
+      roles: dummyRoles,
+      primarySubjectId: dummySubject,
+      divisionId: dummyDivision,
+      classSectionIds: dummyClasses,
+      lang,
+    });
+    if (validationError) {
+      setDummyError(validationError);
+      return;
     }
 
-    setDummyModalOpen(false);
-    setDummyEmail('');
-    setDummyNameAr('');
-    setDummyNameEn('');
-    setDummyClasses([]);
-    setUserActionMsg({
-      type: 'ok',
-      text:
-        lang === 'ar'
-          ? 'تم إنشاء الحساب التجريبي بنجاح ويمكن تسجيل الدخول به فوراً.'
-          : 'Dummy test account created and ready for instant login or impersonation.',
-    });
-    await refreshMasterData();
+    setDummySaving(true);
+    try {
+      const newId = crypto.randomUUID();
+      const normalizedSubjectId = dummyRoles.includes('teacher') ? dummySubject || null : null;
+      const { error } = await supabase.from('profiles').insert({
+        id: newId,
+        email: dummyEmail.trim().toLowerCase(),
+        name_ar: dummyNameAr.trim() || dummyNameEn.trim(),
+        name_en: dummyNameEn.trim() || dummyNameAr.trim(),
+        roles: dummyRoles,
+        active_role: dummyRoles[0],
+        primary_subject_id: normalizedSubjectId,
+        division_id: dummyDivision || null,
+        is_onboarded: true,
+        is_dummy: true,
+        dummy_password: dummyPassword,
+      });
+
+      if (error) {
+        setDummyError(error.message);
+        return;
+      }
+
+      const assignmentRows = buildStaffAssignmentRows({
+        userId: newId,
+        roles: dummyRoles,
+        classSectionIds: dummyClasses,
+        primarySubjectId: normalizedSubjectId,
+      });
+      if (assignmentRows.length > 0) {
+        const { data: insertedRows, error: assignErr } = await supabase
+          .from('staff_class_assignments')
+          .insert(assignmentRows)
+          .select('id');
+        if (assignErr || !insertedRows || insertedRows.length !== assignmentRows.length) {
+          await supabase.from('staff_class_assignments').delete().eq('user_id', newId);
+          await supabase.from('profiles').delete().eq('id', newId);
+          setDummyError(
+            assignErr?.message ||
+              (lang === 'ar'
+                ? 'تعذر حفظ الفصول المحددة للحساب، تم التراجع عن الإنشاء.'
+                : 'Failed to save class assignments; account creation was rolled back.')
+          );
+          return;
+        }
+      }
+
+      setDummyModalOpen(false);
+      setDummyEmail('');
+      setDummyNameAr('');
+      setDummyNameEn('');
+      setDummyClasses([]);
+      setUserActionMsg({
+        type: 'ok',
+        text:
+          lang === 'ar'
+            ? 'تم إنشاء الحساب التجريبي بنجاح ويمكن تسجيل الدخول به فوراً.'
+            : 'Dummy test account created and ready for instant login or impersonation.',
+      });
+      await refreshMasterData();
+    } finally {
+      setDummySaving(false);
+    }
   };
 
   const handleDeleteUser = async () => {
@@ -602,8 +680,15 @@ export const AdminSuite: React.FC = () => {
             <button
               type="button"
               onClick={() => {
+                setDummyError(null);
+                setDummyEmail('');
+                setDummyPassword('123456');
+                setDummyNameAr('');
+                setDummyNameEn('');
+                setDummyRoles(['teacher']);
                 setDummySubject(subjects[0]?.id || '');
-                setDummyDivision(divisions[0]?.id || '');
+                setDummyDivision('');
+                setDummyClasses([]);
                 setDummyModalOpen(true);
               }}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
@@ -1417,6 +1502,7 @@ export const AdminSuite: React.FC = () => {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
+                  disabled={editUserSaving}
                   onClick={() => setEditingUser(null)}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
                 >
@@ -1424,9 +1510,10 @@ export const AdminSuite: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                  disabled={editUserSaving}
+                  className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
                 >
-                  {tr('save', lang)}
+                  {editUserSaving ? tr('loading', lang) : tr('save', lang)}
                 </button>
               </div>
             </form>
@@ -1609,9 +1696,16 @@ export const AdminSuite: React.FC = () => {
                 })}
               </div>
 
+              {dummyError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                  {dummyError}
+                </div>
+              )}
+
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
+                  disabled={dummySaving}
                   onClick={() => setDummyModalOpen(false)}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
                 >
@@ -1619,10 +1713,15 @@ export const AdminSuite: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold cursor-pointer"
+                  disabled={dummySaving}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
                 >
                   <Check className="w-3.5 h-3.5 inline me-1" />
-                  {lang === 'ar' ? 'إنشاء الحساب التجريبي' : 'Create Dummy Account'}
+                  {dummySaving
+                    ? tr('loading', lang)
+                    : lang === 'ar'
+                      ? 'إنشاء الحساب التجريبي'
+                      : 'Create Dummy Account'}
                 </button>
               </div>
             </form>

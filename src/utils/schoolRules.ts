@@ -3,6 +3,7 @@ import type {
   ClassSection,
   Division,
   Grade,
+  Language,
   Profile,
   Section,
   StaffClassAssignment,
@@ -10,6 +11,7 @@ import type {
   Substitution,
   TeacherAbsence,
   TimetableSlot,
+  UserRole,
 } from '../types/database';
 import { getRiyadhParts } from './riyadhTime';
 
@@ -522,3 +524,86 @@ export function filterTeachersInScope(params: {
 
   return matched.length > 0 ? matched : teachers;
 }
+
+export interface StaffClassAssignmentInsert {
+  user_id: string;
+  class_section_id: string;
+  subject_id: string | null;
+  assignment_type: 'teacher' | 'supervisor';
+}
+
+/**
+ * Builds validated, deduplicated staff_class_assignments insert rows for any role combination.
+ * Guarantees assignment_type is always explicitly 'teacher' or 'supervisor' (never null/undefined).
+ */
+export function buildStaffAssignmentRows(params: {
+  userId: string;
+  roles: UserRole[];
+  classSectionIds: string[];
+  primarySubjectId: string | null;
+}): StaffClassAssignmentInsert[] {
+  const { userId, roles, classSectionIds, primarySubjectId } = params;
+  const uniqueClassIds = Array.from(new Set(classSectionIds.filter(Boolean)));
+  if (!userId || uniqueClassIds.length === 0) return [];
+
+  const rows: StaffClassAssignmentInsert[] = [];
+  if (roles.includes('teacher')) {
+    for (const class_section_id of uniqueClassIds) {
+      rows.push({
+        user_id: userId,
+        class_section_id,
+        subject_id: primarySubjectId || null,
+        assignment_type: 'teacher',
+      });
+    }
+  }
+  if (roles.includes('supervisor')) {
+    for (const class_section_id of uniqueClassIds) {
+      rows.push({
+        user_id: userId,
+        class_section_id,
+        subject_id: null,
+        assignment_type: 'supervisor',
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * Validates role-specific requirements across onboarding and admin user management
+ * so no teacher/supervisor/principal/academic_supervisor account is created without its scope.
+ */
+export function validateRoleConfiguration(params: {
+  roles: UserRole[];
+  primarySubjectId: string;
+  divisionId: string;
+  classSectionIds: string[];
+  lang: Language;
+}): string | null {
+  const { roles, primarySubjectId, divisionId, classSectionIds, lang } = params;
+  if (roles.length === 0) {
+    return lang === 'ar' ? 'يرجى اختيار دور واحد على الأقل' : 'Please select at least one role';
+  }
+  if (roles.includes('admin')) {
+    return null;
+  }
+  if (roles.includes('teacher') && !primarySubjectId) {
+    return lang === 'ar' ? 'يرجى اختيار المادة الدراسية للمعلم' : 'Please select a primary subject for Teacher';
+  }
+  if ((roles.includes('teacher') || roles.includes('supervisor')) && classSectionIds.length === 0) {
+    return lang === 'ar'
+      ? 'يرجى اختيار فصل دراسي واحد على الأقل'
+      : 'Please select at least one assigned class section';
+  }
+  if (
+    (roles.includes('principal') || roles.includes('academic_supervisor')) &&
+    !divisionId
+  ) {
+    return lang === 'ar'
+      ? 'يرجى اختيار المرحلة الدراسية'
+      : 'Please select the assigned school division';
+  }
+  return null;
+}
+

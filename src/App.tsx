@@ -31,7 +31,7 @@ const PortalRouter: React.FC = () => {
     }
   }, [userProfile, activeTab]);
 
-  if (authLoading || (masterLoading && !userProfile)) {
+  if (authLoading || (masterLoading && (!userProfile || !userProfile.is_onboarded))) {
     return (
       <div className="min-h-screen meis-mesh-bg flex items-center justify-center p-6">
         <div className="meis-glass rounded-2xl px-8 py-6 text-center">
