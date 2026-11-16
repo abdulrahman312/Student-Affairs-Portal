@@ -62,7 +62,7 @@ All structural, academic, schedule, and lookup data lives in Supabase PostgreSQL
 
 ### Users, Assignments & Students
 - `profiles` (`id, email, name_en, name_ar, roles: UserRole[], active_role: UserRole, primary_subject_id -> subjects.id, division_id -> divisions.id, is_onboarded, is_dummy, dummy_password, created_at`)
-- `staff_class_assignments` (`id, user_id -> profiles.id, class_section_id -> class_sections.id, subject_id -> subjects.id | null`)
+- `staff_class_assignments` (`id, user_id -> profiles.id, class_section_id -> class_sections.id, subject_id -> subjects.id | null, assignment_type ['teacher' | 'supervisor']`)
 - `students` (`id, iqama_id [UNIQUE], name_ar, name_en, father_mobile, grade_id -> grades.id, section_id -> sections.id, class_section_id -> class_sections.id, created_at, updated_at`)
 
 ### Operational Modules

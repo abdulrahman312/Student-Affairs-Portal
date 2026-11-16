@@ -101,6 +101,30 @@ export const OnboardingWizard: React.FC = () => {
 
     setSaving(true);
     try {
+      if (selectedRole === 'teacher' || selectedRole === 'supervisor') {
+        const { error: delErr } = await supabase
+          .from('staff_class_assignments')
+          .delete()
+          .eq('user_id', userProfile.id);
+        if (delErr) {
+          setErrorMsg(delErr.message);
+          return;
+        }
+        const rows = selectedClassIds.map((class_section_id) => ({
+          user_id: userProfile.id,
+          class_section_id,
+          subject_id: selectedRole === 'teacher' ? primarySubjectId : null,
+          assignment_type: selectedRole as 'teacher' | 'supervisor',
+        }));
+        if (rows.length > 0) {
+          const { error: assignErr } = await supabase.from('staff_class_assignments').insert(rows);
+          if (assignErr) {
+            setErrorMsg(assignErr.message);
+            return;
+          }
+        }
+      }
+
       const updatePayload = {
         name_ar: nameAr.trim(),
         name_en: nameEn.trim(),
@@ -122,22 +146,6 @@ export const OnboardingWizard: React.FC = () => {
       if (profErr) {
         setErrorMsg(profErr.message);
         return;
-      }
-
-      if (selectedRole === 'teacher' || selectedRole === 'supervisor') {
-        await supabase.from('staff_class_assignments').delete().eq('user_id', userProfile.id);
-        const rows = selectedClassIds.map((class_section_id) => ({
-          user_id: userProfile.id,
-          class_section_id,
-          subject_id: selectedRole === 'teacher' ? primarySubjectId : null,
-        }));
-        if (rows.length > 0) {
-          const { error: assignErr } = await supabase.from('staff_class_assignments').insert(rows);
-          if (assignErr) {
-            setErrorMsg(assignErr.message);
-            return;
-          }
-        }
       }
 
       await refreshCurrentProfile();

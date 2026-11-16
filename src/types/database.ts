@@ -115,6 +115,7 @@ export interface StaffClassAssignment {
   user_id: string;
   class_section_id: string;
   subject_id: string | null;
+  assignment_type: 'teacher' | 'supervisor';
 }
 
 export interface Student {

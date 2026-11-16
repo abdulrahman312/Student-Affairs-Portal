@@ -51,6 +51,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
   const activeRole = userProfile?.active_role || 'teacher';
   const canManageAll = activeRole !== 'teacher';
+  const showTimetableEditor = activeRole === 'teacher' || activeRole === 'admin';
   const maxSubs = schoolSettings?.max_monthly_substitutions ?? 8;
 
   const teachersList = useMemo(
@@ -77,10 +78,16 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
   useEffect(() => {
     if (userProfile) {
-      setSelectedTeacherId(userProfile.id);
-      setAbsenceTeacherId(userProfile.id);
+      setSelectedTeacherId(
+        userProfile.roles.includes('teacher') ? userProfile.id : teachersList[0]?.id || ''
+      );
+      setAbsenceTeacherId(
+        canManageAll
+          ? teachersList[0]?.id || userProfile.id
+          : userProfile.id
+      );
     }
-  }, [userProfile]);
+  }, [userProfile, canManageAll, teachersList]);
 
   const classMap = useMemo(() => new Map(classSections.map((c) => [c.id, c])), [classSections]);
   const subMap = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
@@ -286,12 +293,22 @@ export const TimetableSubstitutionModule: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">
-          {lang === 'ar' ? 'الجدول المدرسي وحصص الانتظار' : 'Timetable & Period Substitutions'}
+          {showTimetableEditor
+            ? lang === 'ar'
+              ? 'الجدول المدرسي وحصص الانتظار'
+              : 'Timetable & Period Substitutions'
+            : lang === 'ar'
+              ? 'غياب المعلمين وحصص الانتظار'
+              : 'Teacher Absences & Substitutions'}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          {lang === 'ar'
-            ? 'إعداد الجدول الأسبوعي (الأحد - الخميس، الحصص 1 إلى 7) مع فحص التعارض برقم الحصة، وتسجيل الغياب وتوزيع الانتظار.'
-            : 'Weekly Sun–Thu (Periods 1–7) timetable with period-number conflict prevention, absence tracking, and smart substitutions.'}
+          {showTimetableEditor
+            ? lang === 'ar'
+              ? 'إعداد الجدول الأسبوعي (الأحد - الخميس، الحصص 1 إلى 7) مع فحص التعارض برقم الحصة، وتسجيل الغياب وتوزيع الانتظار.'
+              : 'Weekly Sun–Thu (Periods 1–7) timetable with period-number conflict prevention, absence tracking, and smart substitutions.'
+            : lang === 'ar'
+              ? 'تسجيل غياب المعلمين وتعيين المعلمين المتاحين لحصص الانتظار حسب رقم الحصة.'
+              : 'Mark teacher absences and assign available substitute teachers based on their period schedules.'}
         </p>
       </div>
 
@@ -319,7 +336,8 @@ export const TimetableSubstitutionModule: React.FC = () => {
         </section>
       )}
 
-      {/* Weekly Timetable Grid */}
+      {/* Weekly Timetable Grid — Only for Teachers & System Admin */}
+      {showTimetableEditor && (
       <section className="meis-glass rounded-2xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
           <div>
@@ -411,6 +429,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
           </table>
         </div>
       </section>
+      )}
 
       {/* Mark Absence & Smart Substitution Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

@@ -380,7 +380,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
               onClick={() => onNavigate('timetable')}
               className="text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
             >
-              {lang === 'ar' ? 'الجدول والانتظار' : 'Timetable'}
+              {activeRole === 'teacher' || activeRole === 'admin'
+                ? lang === 'ar'
+                  ? 'الجدول والانتظار'
+                  : 'Timetable'
+                : lang === 'ar'
+                  ? 'الغياب والانتظار'
+                  : 'Substitutions'}
             </button>
           </div>
 

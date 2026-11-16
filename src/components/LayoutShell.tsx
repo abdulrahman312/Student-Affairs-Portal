@@ -120,7 +120,12 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({
     },
     {
       id: 'timetable',
-      label: tr('navTimetable', lang),
+      label:
+        activeRole === 'teacher' || activeRole === 'admin'
+          ? tr('navTimetable', lang)
+          : lang === 'ar'
+            ? 'الغياب والانتظار'
+            : 'Absences & Substitutions',
       icon: <CalendarClock className="w-4 h-4" />,
       visible: true,
     },

@@ -83,9 +83,11 @@ export const AdminSuite: React.FC = () => {
   const [dummyDivision, setDummyDivision] = useState('');
   const [dummyClasses, setDummyClasses] = useState<string[]>([]);
   const [userActionMsg, setUserActionMsg] = useState<string | null>(null);
+  const [editUserError, setEditUserError] = useState<string | null>(null);
 
   const openEditUser = (p: Profile) => {
     setEditingUser(p);
+    setEditUserError(null);
     setEditUserNameAr(p.name_ar);
     setEditUserNameEn(p.name_en);
     setEditUserRoles(p.roles || ['teacher']);
@@ -96,14 +98,18 @@ export const AdminSuite: React.FC = () => {
     );
   };
 
+  const resolveAssignmentType = (roles: UserRole[]): 'teacher' | 'supervisor' =>
+    roles.includes('supervisor') && !roles.includes('teacher') ? 'supervisor' : 'teacher';
+
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser || editUserRoles.length === 0) return;
+    setEditUserError(null);
     const nextActiveRole = editUserRoles.includes(editingUser.active_role)
       ? editingUser.active_role
       : editUserRoles[0];
 
-    await supabase
+    const { error: profErr } = await supabase
       .from('profiles')
       .update({
         name_ar: editUserNameAr.trim(),
@@ -116,15 +122,34 @@ export const AdminSuite: React.FC = () => {
       })
       .eq('id', editingUser.id);
 
-    await supabase.from('staff_class_assignments').delete().eq('user_id', editingUser.id);
+    if (profErr) {
+      setEditUserError(profErr.message);
+      return;
+    }
+
+    const { error: delErr } = await supabase
+      .from('staff_class_assignments')
+      .delete()
+      .eq('user_id', editingUser.id);
+    if (delErr) {
+      setEditUserError(delErr.message);
+      return;
+    }
+
     if (editUserClasses.length > 0) {
-      await supabase.from('staff_class_assignments').insert(
+      const assignmentType = resolveAssignmentType(editUserRoles);
+      const { error: assignErr } = await supabase.from('staff_class_assignments').insert(
         editUserClasses.map((csId) => ({
           user_id: editingUser.id,
           class_section_id: csId,
-          subject_id: editUserSubject || null,
+          subject_id: assignmentType === 'teacher' ? editUserSubject || null : null,
+          assignment_type: assignmentType,
         }))
       );
+      if (assignErr) {
+        setEditUserError(assignErr.message);
+        return;
+      }
     }
 
     setEditingUser(null);
@@ -157,13 +182,19 @@ export const AdminSuite: React.FC = () => {
     }
 
     if (dummyClasses.length > 0) {
-      await supabase.from('staff_class_assignments').insert(
+      const assignmentType = resolveAssignmentType(dummyRoles);
+      const { error: assignErr } = await supabase.from('staff_class_assignments').insert(
         dummyClasses.map((csId) => ({
           user_id: newId,
           class_section_id: csId,
-          subject_id: dummySubject || null,
+          subject_id: assignmentType === 'teacher' ? dummySubject || null : null,
+          assignment_type: assignmentType,
         }))
       );
+      if (assignErr) {
+        setUserActionMsg(assignErr.message);
+        return;
+      }
     }
 
     setDummyModalOpen(false);
@@ -1237,6 +1268,12 @@ export const AdminSuite: React.FC = () => {
                   })}
                 </div>
               </div>
+
+              {editUserError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                  {editUserError}
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
