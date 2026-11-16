@@ -15,6 +15,24 @@ import { getRiyadhParts } from './riyadhTime';
 
 const MEIS_CREST_PATH = '/src/assets/images/meis_school_crest_1794849576691.jpg';
 
+// Print-friendly institutional MEIS palette (crisp, light-ink colors for easy office printing)
+const COLORS = {
+  royalNavy: [30, 58, 138] as [number, number, number], // #1e3a8a
+  royalBlue: [37, 99, 235] as [number, number, number], // #2563eb
+  emeraldDark: [4, 120, 87] as [number, number, number], // #047857
+  emeraldMid: [16, 185, 129] as [number, number, number], // #10b981
+  headerBg: [240, 247, 255] as [number, number, number], // soft sky tint
+  headerBorder: [191, 219, 254] as [number, number, number], // blue-200
+  tableHeadBg: [219, 234, 254] as [number, number, number], // blue-100
+  tableHeadBorder: [147, 197, 253] as [number, number, number], // blue-300
+  cardBg: [248, 250, 252] as [number, number, number], // slate-50
+  cardBorder: [203, 213, 225] as [number, number, number], // slate-300
+  bodyText: [30, 41, 59] as [number, number, number], // slate-800
+  mutedText: [71, 85, 105] as [number, number, number], // slate-600
+  subtleText: [100, 116, 139] as [number, number, number], // slate-500
+  zebraBg: [248, 250, 252] as [number, number, number], // slate-50
+};
+
 async function loadImageAsDataUrl(src: string): Promise<string | null> {
   try {
     const img = new Image();
@@ -46,49 +64,76 @@ async function drawMeisHeader(
 ): Promise<number> {
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Top navy header band
-  doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(0, 0, pageWidth, 34, 'F');
+  // Light print-friendly header background card with royal blue + emerald accent stripes
+  doc.setFillColor(...COLORS.headerBg);
+  doc.rect(0, 0, pageWidth, 35, 'F');
 
-  // Emerald accent bar
-  doc.setFillColor(16, 185, 129); // emerald-500
-  doc.rect(0, 34, pageWidth, 2, 'F');
+  // Top Royal Blue + Emerald dual accent lines
+  doc.setFillColor(...COLORS.royalNavy);
+  doc.rect(0, 0, pageWidth, 2.5, 'F');
+  doc.setFillColor(...COLORS.emeraldMid);
+  doc.rect(0, 35, pageWidth, 1.2, 'F');
 
-  // School crest logo
+  doc.setDrawColor(...COLORS.headerBorder);
+  doc.setLineWidth(0.3);
+  doc.line(0, 34.8, pageWidth, 34.8);
+
+  // School crest logo framed in white
   const logoData =
     (await loadImageAsDataUrl(MEIS_CREST_PATH)) ||
     (settings?.school_logo_url ? await loadImageAsDataUrl(settings.school_logo_url) : null);
 
   if (logoData) {
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(12, 5, 24, 24, 3, 3, 'F');
-    doc.addImage(logoData, 'JPEG', 13, 6, 22, 22);
+    doc.setDrawColor(...COLORS.headerBorder);
+    doc.roundedRect(14, 6, 24, 24, 3, 3, 'FD');
+    doc.addImage(logoData, 'JPEG', 15, 7, 22, 22);
   }
 
-  const textX = logoData ? 42 : 14;
-  doc.setTextColor(255, 255, 255);
+  const textX = logoData ? 44 : 14;
+  doc.setTextColor(...COLORS.royalNavy);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
-  doc.text(settings?.school_name_en || 'Middle East International School', textX, 14);
+  doc.text(settings?.school_name_en || 'Middle East International School', textX, 14.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(148, 163, 184);
-  doc.text('Riyadh, Kingdom of Saudi Arabia  |  Official Academic & Student Affairs Record', textX, 20.5);
+  doc.setFontSize(8.8);
+  doc.setTextColor(...COLORS.mutedText);
+  doc.text('Riyadh, Kingdom of Saudi Arabia  |  Official Academic & Student Affairs Record', textX, 20.8);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.setTextColor(52, 211, 153); // emerald-400
-  doc.text(title.toUpperCase(), textX, 28);
+  doc.setTextColor(...COLORS.emeraldDark);
+  doc.text(title.toUpperCase(), textX, 28.5);
 
   const todayStr = getRiyadhParts(new Date()).dateStr;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
-  doc.setTextColor(226, 232, 240);
-  doc.text(`Generated: ${todayStr} (Riyadh)`, pageWidth - 14, 14, { align: 'right' });
-  doc.text(subtitle, pageWidth - 14, 20.5, { align: 'right' });
+  doc.setTextColor(...COLORS.mutedText);
+  doc.text(`Generated: ${todayStr} (Riyadh)`, pageWidth - 14, 14.5, { align: 'right' });
+  doc.text(subtitle, pageWidth - 14, 20.8, { align: 'right' });
 
   return 44;
+}
+
+function drawFooter(doc: jsPDF, settings: SchoolSettings | null): void {
+  const pageCount = doc.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const schoolName = settings?.school_name_en || 'Middle East International School';
+
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(...COLORS.cardBorder);
+    doc.setLineWidth(0.25);
+    doc.line(14, pageHeight - 13, pageWidth - 14, pageHeight - 13);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...COLORS.subtleText);
+    doc.text(`${schoolName} · Riyadh · Official School Document`, 14, pageHeight - 8);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 14, pageHeight - 8, { align: 'right' });
+  }
 }
 
 export async function exportBehaviorReportPdf(params: {
@@ -115,28 +160,32 @@ export async function exportBehaviorReportPdf(params: {
     settings
   );
 
-  // Student info card
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
+  // Student info card with clean blue left accent stripe
+  doc.setFillColor(...COLORS.cardBg);
+  doc.setDrawColor(...COLORS.cardBorder);
+  doc.setLineWidth(0.3);
   doc.roundedRect(14, y, pageWidth - 28, 24, 3, 3, 'FD');
 
-  doc.setTextColor(15, 23, 42);
+  doc.setFillColor(...COLORS.royalBlue);
+  doc.rect(14, y + 2, 2, 20, 'F');
+
+  doc.setTextColor(...COLORS.royalNavy);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(student.name_en || 'Student', 18, y + 8);
+  doc.text(student.name_en || 'Student', 20, y + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text(`ID / Iqama: ${student.iqama_id}`, 18, y + 14.5);
-  doc.text(`Class & Section: ${classSection?.display_name_en || '-'}`, 18, y + 20);
+  doc.setTextColor(...COLORS.mutedText);
+  doc.text(`ID / Iqama: ${student.iqama_id}`, 20, y + 14.5);
+  doc.text(`Class & Section: ${classSection?.display_name_en || '-'}`, 20, y + 20);
   doc.text(`Father Mobile: +${student.father_mobile || '-'}`, pageWidth - 18, y + 14.5, {
     align: 'right',
   });
 
   y += 30;
 
-  // Summary statistics badges
+  // Summary statistics badges with crisp borders for clear B&W or color printing
   const totalIncidents = logs.length;
   const totalSeverity = logs.reduce(
     (sum, l) => sum + (catMap.get(l.behavior_category_id)?.severity_points || 1),
@@ -152,15 +201,34 @@ export async function exportBehaviorReportPdf(params: {
 
   const cardWidth = (pageWidth - 36) / 3;
   const badges = [
-    { label: 'TOTAL INCIDENTS', value: String(totalIncidents), bg: [239, 246, 255], fg: [29, 78, 216] },
-    { label: 'SEVERITY POINTS', value: String(totalSeverity), bg: [254, 242, 242], fg: [185, 28, 28] },
-    { label: 'MOST FREQUENT', value: topBehavior.slice(0, 26), bg: [236, 253, 245], fg: [4, 120, 87] },
+    {
+      label: 'TOTAL INCIDENTS',
+      value: String(totalIncidents),
+      bg: [239, 246, 255],
+      border: [191, 219, 254],
+      fg: [29, 78, 216],
+    },
+    {
+      label: 'SEVERITY POINTS',
+      value: String(totalSeverity),
+      bg: [254, 242, 242],
+      border: [254, 202, 202],
+      fg: [185, 28, 28],
+    },
+    {
+      label: 'MOST FREQUENT',
+      value: topBehavior.slice(0, 26),
+      bg: [236, 253, 245],
+      border: [167, 243, 208],
+      fg: [4, 120, 87],
+    },
   ];
 
   badges.forEach((b, idx) => {
     const bx = 14 + idx * (cardWidth + 4);
     doc.setFillColor(b.bg[0], b.bg[1], b.bg[2]);
-    doc.roundedRect(bx, y, cardWidth, 16, 2.5, 2.5, 'F');
+    doc.setDrawColor(b.border[0], b.border[1], b.border[2]);
+    doc.roundedRect(bx, y, cardWidth, 16, 2.5, 2.5, 'FD');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(b.fg[0], b.fg[1], b.fg[2]);
@@ -207,18 +275,24 @@ export async function exportBehaviorReportPdf(params: {
       : [['-', '-', '-', '-', 'No behavior incidents recorded', '-', '-', '-']],
     theme: 'grid',
     headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: [255, 255, 255],
+      fillColor: COLORS.tableHeadBg,
+      textColor: COLORS.royalNavy,
+      lineColor: COLORS.tableHeadBorder,
+      lineWidth: 0.35,
       fontStyle: 'bold',
       fontSize: 8.5,
     },
+    styles: {
+      lineColor: COLORS.cardBorder,
+      lineWidth: 0.25,
+    },
     bodyStyles: {
       fontSize: 8,
-      textColor: [30, 41, 59],
+      textColor: COLORS.bodyText,
       cellPadding: 2.5,
     },
     alternateRowStyles: {
-      fillColor: [248, 250, 252],
+      fillColor: COLORS.zebraBg,
     },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
@@ -230,8 +304,10 @@ export async function exportBehaviorReportPdf(params: {
       6: { cellWidth: 28 },
       7: { cellWidth: 'auto' },
     },
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 18 },
   });
+
+  drawFooter(doc, settings);
 
   const safeName = (student.name_en || student.iqama_id).replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`MEIS_Behavior_Report_${safeName}.pdf`);
@@ -260,21 +336,25 @@ export async function exportPerformanceReportPdf(params: {
     settings
   );
 
-  // Student summary box
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
+  // Student summary box with clean blue left accent stripe
+  doc.setFillColor(...COLORS.cardBg);
+  doc.setDrawColor(...COLORS.cardBorder);
+  doc.setLineWidth(0.3);
   doc.roundedRect(14, y, pageWidth - 28, 24, 3, 3, 'FD');
 
-  doc.setTextColor(15, 23, 42);
+  doc.setFillColor(...COLORS.emeraldMid);
+  doc.rect(14, y + 2, 2, 20, 'F');
+
+  doc.setTextColor(...COLORS.royalNavy);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(student.name_en || 'Student', 18, y + 8);
+  doc.text(student.name_en || 'Student', 20, y + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text(`ID / Iqama: ${student.iqama_id}`, 18, y + 14.5);
-  doc.text(`Grade & Section: ${classSection?.display_name_en || '-'}`, 18, y + 20);
+  doc.setTextColor(...COLORS.mutedText);
+  doc.text(`ID / Iqama: ${student.iqama_id}`, 20, y + 14.5);
+  doc.text(`Grade & Section: ${classSection?.display_name_en || '-'}`, 20, y + 20);
   doc.text(`Father Mobile: +${student.father_mobile || '-'}`, pageWidth - 18, y + 14.5, {
     align: 'right',
   });
@@ -291,10 +371,13 @@ export async function exportPerformanceReportPdf(params: {
   // Strictly 2-Column Table: Left = Subject Name (English) | Right = Teacher's Comment (with Teacher's English Name)
   const rows = sortedComments.map((c) => {
     const subjectName = subMap.get(c.subject_id)?.name_en || 'Subject';
-    const teacherName = c.teacher_id ? profMap.get(c.teacher_id)?.name_en || 'Teacher' : 'Assigned Teacher';
-    const commentBlock = c.is_submitted && c.comment_text
-      ? `${c.comment_text}\n\n— Teacher: ${teacherName}`
-      : `Pending evaluation\n\n— Assigned Teacher: ${teacherName}`;
+    const teacherName = c.teacher_id
+      ? profMap.get(c.teacher_id)?.name_en || 'Teacher'
+      : 'Assigned Teacher';
+    const commentBlock =
+      c.is_submitted && c.comment_text
+        ? `${c.comment_text}\n\n— Teacher: ${teacherName}`
+        : `Pending evaluation\n\n— Assigned Teacher: ${teacherName}`;
     return [subjectName, commentBlock];
   });
 
@@ -304,27 +387,35 @@ export async function exportPerformanceReportPdf(params: {
     body: rows.length ? rows : [['No subjects assigned', 'No teacher evaluations requested yet.']],
     theme: 'grid',
     headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: [255, 255, 255],
+      fillColor: COLORS.tableHeadBg,
+      textColor: COLORS.royalNavy,
+      lineColor: COLORS.tableHeadBorder,
+      lineWidth: 0.35,
       fontStyle: 'bold',
       fontSize: 9.5,
       cellPadding: 3.5,
     },
+    styles: {
+      lineColor: COLORS.cardBorder,
+      lineWidth: 0.25,
+    },
     bodyStyles: {
       fontSize: 9,
-      textColor: [30, 41, 59],
+      textColor: COLORS.bodyText,
       cellPadding: 4,
       valign: 'top',
     },
     alternateRowStyles: {
-      fillColor: [248, 250, 252],
+      fillColor: COLORS.zebraBg,
     },
     columnStyles: {
-      0: { cellWidth: 48, fontStyle: 'bold', textColor: [15, 23, 42] },
+      0: { cellWidth: 48, fontStyle: 'bold', textColor: COLORS.emeraldDark },
       1: { cellWidth: 'auto' },
     },
-    margin: { left: 14, right: 14 },
+    margin: { left: 14, right: 14, bottom: 18 },
   });
+
+  drawFooter(doc, settings);
 
   const safeName = (student.name_en || student.iqama_id).replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`MEIS_Performance_Report_${safeName}_${request.request_date}.pdf`);

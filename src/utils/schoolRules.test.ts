@@ -13,6 +13,7 @@ import {
   parseStudentExcelRows,
   validateRoleConfiguration,
 } from './schoolRules';
+import { addDaysToDateStr, getSchoolWeekBounds } from './riyadhTime';
 import type {
   BehaviorLog,
   ClassSection,
@@ -503,4 +504,14 @@ test('validateRoleConfiguration validates role-specific requirements', () => {
     null
   );
 });
+
+test('getSchoolWeekBounds returns Sunday through Thursday/Saturday for any date', () => {
+  // Monday 2026-11-16 -> Sun 2026-11-15 .. Thu 2026-11-19 .. Sat 2026-11-21
+  const bounds = getSchoolWeekBounds('2026-11-16');
+  assert.equal(bounds.weekStart, '2026-11-15');
+  assert.equal(bounds.weekEndThu, '2026-11-19');
+  assert.equal(bounds.weekEndSat, '2026-11-21');
+  assert.equal(addDaysToDateStr('2026-11-15', 7), '2026-11-22');
+});
+
 

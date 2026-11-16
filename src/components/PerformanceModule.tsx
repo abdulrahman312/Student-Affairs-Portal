@@ -63,6 +63,7 @@ export const PerformanceModule: React.FC = () => {
     activeRole === 'principal' ||
     activeRole === 'academic_supervisor' ||
     activeRole === 'admin';
+  const canViewTracker = canRequest || activeRole === 'supervisor';
 
   const loadData = async () => {
     setLoading(true);
@@ -266,15 +267,15 @@ export const PerformanceModule: React.FC = () => {
     [myTeacherComments]
   );
 
+  const scopedStudentIds = useMemo(
+    () => new Set(scope.students.map((s) => s.id)),
+    [scope.students]
+  );
+
   const scopedRequests = useMemo(() => {
     if (scope.isUnrestricted) return requests;
-    return requests.filter((r) => {
-      const st = studentMap.get(r.student_id);
-      return st
-        ? scope.classSectionIds.has(st.class_section_id) || scope.gradeIds.has(st.grade_id)
-        : false;
-    });
-  }, [requests, scope, studentMap]);
+    return requests.filter((r) => scopedStudentIds.has(r.student_id));
+  }, [requests, scope.isUnrestricted, scopedStudentIds]);
 
   const handleDownloadPdf = async (req: PerformanceRequest) => {
     const st = studentMap.get(req.student_id);
@@ -513,8 +514,8 @@ export const PerformanceModule: React.FC = () => {
         </section>
       )}
 
-      {/* Active & Completed Requests Tracker */}
-      {canRequest && (
+      {/* Active & Completed Requests Tracker (Principal, Academic Supervisor, Supervisor, Admin) */}
+      {canViewTracker && (
         <section className="meis-glass rounded-2xl p-5">
           <h2 className="text-base font-bold text-slate-900 pb-3 border-b border-slate-200/80">
             {lang === 'ar' ? 'متابعة تقارير الأداء المطلوبة' : 'Requested Reports Progress'}
@@ -568,7 +569,7 @@ export const PerformanceModule: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => void handleDownloadPdf(req)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold cursor-pointer"
                       >
                         <FileDown className="w-3.5 h-3.5" />
                         <span>{lang === 'ar' ? 'تحميل PDF' : 'Download PDF Report'}</span>
@@ -584,14 +585,16 @@ export const PerformanceModule: React.FC = () => {
                           <span>{tr('whatsappFather', lang)}</span>
                         </a>
                       )}
-                      <button
-                        type="button"
-                        aria-label="Delete report request"
-                        onClick={() => void handleDeleteRequest(req.id)}
-                        className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {canRequest && (
+                        <button
+                          type="button"
+                          aria-label="Delete report request"
+                          onClick={() => void handleDeleteRequest(req.id)}
+                          className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -625,7 +628,7 @@ export const PerformanceModule: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => void handleDownloadPdf(previewReq)}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold cursor-pointer"
                       >
                         <FileDown className="w-4 h-4" />
                         <span>Download PDF Report</span>
@@ -642,11 +645,11 @@ export const PerformanceModule: React.FC = () => {
                   </div>
 
                   <div className="mt-4 overflow-x-auto">
-                    <table className="w-full text-sm border border-slate-200 rounded-xl overflow-hidden" dir="ltr">
-                      <thead className="bg-slate-900 text-white text-xs">
+                    <table className="w-full text-sm border border-blue-200 rounded-xl overflow-hidden" dir="ltr">
+                      <thead className="bg-blue-50 text-blue-950 border-b border-blue-200 text-xs">
                         <tr>
-                          <th className="py-2.5 px-4 text-left w-48">Subject Name</th>
-                          <th className="py-2.5 px-4 text-left">Teacher&apos;s Comment</th>
+                          <th className="py-2.5 px-4 text-left w-48 font-bold">Subject Name</th>
+                          <th className="py-2.5 px-4 text-left font-bold">Teacher&apos;s Comment</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">

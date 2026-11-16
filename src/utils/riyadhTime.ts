@@ -147,3 +147,29 @@ export function getIsoWeekdayFromDateStr(dateStr: string): number {
   if (!y || !m || !d) return 0;
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
+
+export function addDaysToDateStr(dateStr: string, offsetDays: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d + offsetDays));
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * Returns Sunday..Saturday bounds for the Saudi school week containing `anchorDateStr`.
+ * `weekEndThu` is Thursday (Sun + 4), `weekEndSat` is Saturday (Sun + 6).
+ */
+export function getSchoolWeekBounds(anchorDateStr: string): {
+  weekStart: string;
+  weekEndThu: string;
+  weekEndSat: string;
+} {
+  const dow = getIsoWeekdayFromDateStr(anchorDateStr); // 0 = Sun .. 6 = Sat
+  const weekStart = addDaysToDateStr(anchorDateStr, -dow);
+  return {
+    weekStart,
+    weekEndThu: addDaysToDateStr(weekStart, 4),
+    weekEndSat: addDaysToDateStr(weekStart, 6),
+  };
+}
+

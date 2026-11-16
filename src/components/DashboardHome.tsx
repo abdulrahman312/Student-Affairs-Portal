@@ -130,15 +130,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
     [scopedBehaviorLogs, riyadhToday]
   );
 
+  const scopedStudentIds = useMemo(
+    () => new Set(scope.students.map((s) => s.id)),
+    [scope.students]
+  );
+
   const scopedPerfRequests = useMemo(() => {
     if (scope.isUnrestricted) return perfRequests;
-    return perfRequests.filter((r) => {
-      const st = studentMap.get(r.student_id);
-      return st
-        ? scope.classSectionIds.has(st.class_section_id) || scope.gradeIds.has(st.grade_id)
-        : false;
-    });
-  }, [perfRequests, scope, studentMap]);
+    return perfRequests.filter((r) => scopedStudentIds.has(r.student_id));
+  }, [perfRequests, scope.isUnrestricted, scopedStudentIds]);
 
   const scopedAbsences = useMemo(() => {
     if (scope.isUnrestricted) return absences;

@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarX, CheckCircle2, Trash2, UserPlus } from 'lucide-react';
+import {
+  AlertCircle,
+  CalendarX,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import type { Substitution, TeacherAbsence, TimetableSlot } from '../types/database';
@@ -9,7 +17,12 @@ import {
   getLocalizedName,
   tr,
 } from '../utils/i18n';
-import { getIsoWeekdayFromDateStr, getRiyadhParts } from '../utils/riyadhTime';
+import {
+  addDaysToDateStr,
+  getIsoWeekdayFromDateStr,
+  getRiyadhParts,
+  getSchoolWeekBounds,
+} from '../utils/riyadhTime';
 import {
   checkTimetableConflict,
   filterTeachersInScope,
@@ -50,6 +63,8 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
   // Absence & Substitution state
   const [absenceDate, setAbsenceDate] = useState(riyadhToday);
+  const [weekAnchorDate, setWeekAnchorDate] = useState(riyadhToday);
+  const [absenceViewMode, setAbsenceViewMode] = useState<'week' | 'upcoming'>('week');
   const [absenceTeacherId, setAbsenceTeacherId] = useState(userProfile?.id || '');
   const [absenceReason, setAbsenceReason] = useState('');
   const [absenceError, setAbsenceError] = useState<string | null>(null);
@@ -293,20 +308,33 @@ export const TimetableSubstitutionModule: React.FC = () => {
     await loadAll();
   };
 
-  const selectedDateAbsences = useMemo(() => {
-    const byDate = absences.filter((a) => a.absence_date === absenceDate);
-    if (!canManageAll) {
-      return byDate.filter((a) => a.teacher_id === userProfile?.id);
-    }
-    if (scope.isUnrestricted) return byDate;
-    const allowedIds = new Set(teachersList.map((t) => t.id));
-    return byDate.filter((a) => allowedIds.has(a.teacher_id));
-  }, [absences, absenceDate, canManageAll, userProfile, scope.isUnrestricted, teachersList]);
+  const weekBounds = useMemo(() => getSchoolWeekBounds(weekAnchorDate), [weekAnchorDate]);
 
-  const selectedDateWeekday = useMemo(
-    () => getIsoWeekdayFromDateStr(absenceDate),
-    [absenceDate]
+  const roleScopedAbsences = useMemo(() => {
+    if (!canManageAll) {
+      return absences.filter((a) => a.teacher_id === userProfile?.id);
+    }
+    if (scope.isUnrestricted) return absences;
+    const allowedIds = new Set(teachersList.map((t) => t.id));
+    return absences.filter((a) => allowedIds.has(a.teacher_id));
+  }, [absences, canManageAll, userProfile, scope.isUnrestricted, teachersList]);
+
+  const upcomingAbsencesCount = useMemo(
+    () => roleScopedAbsences.filter((a) => a.absence_date >= riyadhToday).length,
+    [roleScopedAbsences, riyadhToday]
   );
+
+  const displayedAbsences = useMemo(() => {
+    const filtered =
+      absenceViewMode === 'upcoming'
+        ? roleScopedAbsences.filter((a) => a.absence_date >= riyadhToday)
+        : roleScopedAbsences.filter(
+            (a) =>
+              a.absence_date >= weekBounds.weekStart &&
+              a.absence_date <= weekBounds.weekEndSat
+          );
+    return filtered.slice().sort((a, b) => a.absence_date.localeCompare(b.absence_date));
+  }, [roleScopedAbsences, absenceViewMode, riyadhToday, weekBounds]);
 
   const mySubstitutionsToday = useMemo(() => {
     if (!userProfile) return [];
@@ -526,7 +554,11 @@ export const TimetableSubstitutionModule: React.FC = () => {
                 dir="ltr"
                 required
                 value={absenceDate}
-                onChange={(e) => setAbsenceDate(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setAbsenceDate(next);
+                  if (next) setWeekAnchorDate(next);
+                }}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
               />
             </div>
@@ -580,9 +612,9 @@ export const TimetableSubstitutionModule: React.FC = () => {
           </form>
         </section>
 
-        {/* Absences & Smart Substitution List */}
+        {/* Absences & Smart Substitution List (Whole Week & Upcoming) */}
         <section className="lg:col-span-8 meis-glass rounded-2xl p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {lang === 'ar'
@@ -590,43 +622,151 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   : 'Absent Teachers & Smart Substitutions'}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
-                {absenceDate} ·{' '}
-                {DAY_NAMES[selectedDateWeekday]
-                  ? DAY_NAMES[selectedDateWeekday][lang]
+                {absenceViewMode === 'week'
+                  ? lang === 'ar'
+                    ? `الأسبوع الدراسي: ${weekBounds.weekStart} إلى ${weekBounds.weekEndThu}`
+                    : `School Week: ${weekBounds.weekStart} (Sun) — ${weekBounds.weekEndThu} (Thu)`
                   : lang === 'ar'
-                    ? 'عطلة نهاية الأسبوع'
-                    : 'Weekend'}
+                    ? `جميع الغيابات القادمة ابتداءً من ${riyadhToday}`
+                    : `All Upcoming Absences (from ${riyadhToday})`}
               </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setAbsenceViewMode('week')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                    absenceViewMode === 'week'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {lang === 'ar' ? 'الأسبوع كامل' : 'Full Week'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAbsenceViewMode('upcoming')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap tabular-nums ${
+                    absenceViewMode === 'upcoming'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {lang === 'ar'
+                    ? `القادمة (${upcomingAbsencesCount})`
+                    : `All Upcoming (${upcomingAbsencesCount})`}
+                </button>
+              </div>
+
+              {absenceViewMode === 'week' && (
+                <div className="inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Previous week"
+                    onClick={() => setWeekAnchorDate((d) => addDaysToDateStr(d, -7))}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                  >
+                    {lang === 'ar' ? (
+                      <ChevronRight className="w-4 h-4" />
+                    ) : (
+                      <ChevronLeft className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWeekAnchorDate(riyadhToday)}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                  >
+                    {lang === 'ar' ? 'هذا الأسبوع' : 'This Week'}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next week"
+                    onClick={() => setWeekAnchorDate((d) => addDaysToDateStr(d, 7))}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                  >
+                    {lang === 'ar' ? (
+                      <ChevronLeft className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="mt-4 space-y-4">
             {loading ? (
               <p className="text-xs text-slate-500 py-8 text-center">{tr('loading', lang)}</p>
-            ) : selectedDateAbsences.length === 0 ? (
-              <p className="text-xs text-slate-500 py-10 text-center">
-                {lang === 'ar'
-                  ? 'لا يوجد معلمون غائبون في هذا التاريخ.'
-                  : 'No teacher absences recorded for this date.'}
-              </p>
+            ) : displayedAbsences.length === 0 ? (
+              <div className="py-10 text-center space-y-2">
+                <p className="text-xs text-slate-500">
+                  {absenceViewMode === 'week'
+                    ? lang === 'ar'
+                      ? 'لا توجد غيابات مسجلة للمعلمين خلال هذا الأسبوع.'
+                      : 'No teacher absences recorded for this week.'
+                    : lang === 'ar'
+                      ? 'لا توجد غيابات قادمة مسجلة حالياً.'
+                      : 'No upcoming teacher absences recorded.'}
+                </p>
+                {absenceViewMode === 'week' && upcomingAbsencesCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAbsenceViewMode('upcoming')}
+                    className="text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    {lang === 'ar'
+                      ? `عرض ${upcomingAbsencesCount} غياب مسجل في التواريخ القادمة`
+                      : `View ${upcomingAbsencesCount} upcoming absence(s) in future weeks`}
+                  </button>
+                )}
+              </div>
             ) : (
-              selectedDateAbsences.map((abs) => {
+              displayedAbsences.map((abs) => {
                 const teacher = profMap.get(abs.teacher_id);
+                const absWeekday = getIsoWeekdayFromDateStr(abs.absence_date);
+                const weekdayLabel = DAY_NAMES[absWeekday]
+                  ? DAY_NAMES[absWeekday][lang]
+                  : lang === 'ar'
+                    ? 'عطلة نهاية الأسبوع'
+                    : 'Weekend';
+                const isToday = abs.absence_date === riyadhToday;
+                const isFuture = abs.absence_date > riyadhToday;
+
                 const teacherDaySlots = slots
                   .filter(
-                    (s) =>
-                      s.teacher_id === abs.teacher_id && s.day_of_week === selectedDateWeekday
+                    (s) => s.teacher_id === abs.teacher_id && s.day_of_week === absWeekday
                   )
                   .sort((a, b) => a.period_number - b.period_number);
 
                 return (
                   <div
                     key={abs.id}
-                    className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-3"
+                    className={`p-4 rounded-xl bg-white border space-y-3 ${
+                      isToday ? 'border-emerald-300' : 'border-slate-200/80'
+                    }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-bold text-slate-900">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md tabular-nums">
+                            {abs.absence_date} · {weekdayLabel}
+                          </span>
+                          {isToday && (
+                            <span className="text-[11px] font-bold text-emerald-700">
+                              {lang === 'ar' ? 'اليوم' : 'Today'}
+                            </span>
+                          )}
+                          {isFuture && (
+                            <span className="text-[11px] font-bold text-amber-700">
+                              {lang === 'ar' ? 'قادم' : 'Upcoming'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-bold text-slate-900 mt-1.5">
                           {getLocalizedName(teacher, lang)}
                         </p>
                         {abs.reason && (
