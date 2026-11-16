@@ -113,6 +113,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshMasterData = useCallback(async () => {
     setMasterLoading(true);
     try {
+      const fetchAllStudents = async (): Promise<Student[]> => {
+        const pageSize = 1000;
+        const all: Student[] = [];
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('students')
+            .select('*')
+            .order('name_en')
+            .range(from, from + pageSize - 1);
+          if (error || !data || data.length === 0) break;
+          all.push(...(data as Student[]));
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      };
+
       const [
         settingsRes,
         divRes,
@@ -124,7 +142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         behRes,
         dutyRes,
         profRes,
-        stuRes,
+        allStudents,
         scaRes,
         notRes,
       ] = await Promise.all([
@@ -138,22 +156,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabase.from('behavior_categories').select('*').order('sort_order'),
         supabase.from('duty_types').select('*').order('sort_order'),
         supabase.from('profiles').select('*').order('name_en'),
-        supabase.from('students').select('*').order('name_en'),
+        fetchAllStudents(),
         supabase.from('staff_class_assignments').select('*'),
         supabase.from('notices').select('*').order('created_at', { ascending: false }),
       ]);
 
+      const fetchedGrades = (gradeRes.data || []) as Grade[];
+      const fetchedSections = (secRes.data || []) as Section[];
+      const fetchedClassSections = (csRes.data || []) as ClassSection[];
+      const gradeOrderMap = new Map(fetchedGrades.map((g) => [g.id, g.sort_order]));
+      const sectionOrderMap = new Map(fetchedSections.map((s) => [s.id, s.sort_order]));
+      const sortedClassSections = fetchedClassSections.slice().sort((a, b) => {
+        const ga = gradeOrderMap.get(a.grade_id) ?? 999;
+        const gb = gradeOrderMap.get(b.grade_id) ?? 999;
+        if (ga !== gb) return ga - gb;
+        const sa = sectionOrderMap.get(a.section_id) ?? 999;
+        const sb = sectionOrderMap.get(b.section_id) ?? 999;
+        if (sa !== sb) return sa - sb;
+        return a.display_name_en.localeCompare(b.display_name_en);
+      });
+
       if (settingsRes.data) setSchoolSettings(settingsRes.data as SchoolSettings);
       if (divRes.data) setDivisions(divRes.data as Division[]);
-      if (gradeRes.data) setGrades(gradeRes.data as Grade[]);
-      if (secRes.data) setSections(secRes.data as Section[]);
-      if (csRes.data) setClassSections(csRes.data as ClassSection[]);
+      setGrades(fetchedGrades);
+      setSections(fetchedSections);
+      setClassSections(sortedClassSections);
       if (subRes.data) setSubjects(subRes.data as Subject[]);
       if (tsRes.data) setTimeslots(tsRes.data as Timeslot[]);
       if (behRes.data) setBehaviorCategories(behRes.data as BehaviorCategory[]);
       if (dutyRes.data) setDutyTypes(dutyRes.data as DutyType[]);
       if (profRes.data) setProfiles(profRes.data as Profile[]);
-      if (stuRes.data) setStudents(stuRes.data as Student[]);
+      setStudents(allStudents);
       if (scaRes.data) setStaffAssignments(scaRes.data as StaffClassAssignment[]);
       if (notRes.data) setNotices(notRes.data as Notice[]);
     } finally {

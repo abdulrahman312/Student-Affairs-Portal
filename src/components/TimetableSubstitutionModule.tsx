@@ -10,7 +10,12 @@ import {
   tr,
 } from '../utils/i18n';
 import { getIsoWeekdayFromDateStr, getRiyadhParts } from '../utils/riyadhTime';
-import { checkTimetableConflict, getAvailableSubstitutes } from '../utils/schoolRules';
+import {
+  checkTimetableConflict,
+  filterTeachersInScope,
+  getAvailableSubstitutes,
+  getRoleScope,
+} from '../utils/schoolRules';
 
 const DAYS = [0, 1, 2, 3, 4]; // Sun - Thu
 const PERIODS = [1, 2, 3, 4, 5, 6, 7];
@@ -20,9 +25,14 @@ export const TimetableSubstitutionModule: React.FC = () => {
     lang,
     userProfile,
     schoolSettings,
+    divisions,
+    grades,
+    sections,
     classSections,
     subjects,
     profiles,
+    staffAssignments,
+    students,
   } = useApp();
 
   const riyadhToday = getRiyadhParts(new Date()).dateStr;
@@ -54,9 +64,23 @@ export const TimetableSubstitutionModule: React.FC = () => {
   const showTimetableEditor = activeRole === 'teacher' || activeRole === 'admin';
   const maxSubs = schoolSettings?.max_monthly_substitutions ?? 8;
 
+  const scope = useMemo(
+    () =>
+      getRoleScope({
+        profile: userProfile,
+        divisions,
+        grades,
+        sections,
+        classSections,
+        staffAssignments,
+        students,
+      }),
+    [userProfile, divisions, grades, sections, classSections, staffAssignments, students]
+  );
+
   const teachersList = useMemo(
-    () => profiles.filter((p) => p.roles.includes('teacher')),
-    [profiles]
+    () => filterTeachersInScope({ profiles, scope, staffAssignments, timetableSlots: slots }),
+    [profiles, scope, staffAssignments, slots]
   );
 
   const loadAll = async () => {
@@ -79,7 +103,9 @@ export const TimetableSubstitutionModule: React.FC = () => {
   useEffect(() => {
     if (userProfile) {
       setSelectedTeacherId(
-        userProfile.roles.includes('teacher') ? userProfile.id : teachersList[0]?.id || ''
+        userProfile.roles.includes('teacher') && activeRole === 'teacher'
+          ? userProfile.id
+          : teachersList[0]?.id || userProfile.id
       );
       setAbsenceTeacherId(
         canManageAll
@@ -87,7 +113,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
           : userProfile.id
       );
     }
-  }, [userProfile, canManageAll, teachersList]);
+  }, [userProfile, activeRole, canManageAll, teachersList]);
 
   const classMap = useMemo(() => new Map(classSections.map((c) => [c.id, c])), [classSections]);
   const subMap = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
@@ -95,6 +121,39 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
   const viewingTeacherId = canManageAll ? selectedTeacherId || userProfile?.id || '' : userProfile?.id || '';
   const viewingTeacher = profMap.get(viewingTeacherId);
+
+  const viewingTeacherClassSections = useMemo(() => {
+    if (!viewingTeacherId) return [];
+    const assigned = staffAssignments.filter(
+      (a) => a.user_id === viewingTeacherId && a.assignment_type === 'teacher'
+    );
+    const fallbackAssigned =
+      assigned.length > 0
+        ? assigned
+        : staffAssignments.filter((a) => a.user_id === viewingTeacherId);
+
+    if (fallbackAssigned.length > 0) {
+      const allowedIds = new Set(fallbackAssigned.map((a) => a.class_section_id));
+      return classSections.filter((cs) => allowedIds.has(cs.id));
+    }
+
+    if (viewingTeacher?.division_id) {
+      const divGradeIds = new Set(
+        grades.filter((g) => g.division_id === viewingTeacher.division_id).map((g) => g.id)
+      );
+      return classSections.filter((cs) => divGradeIds.has(cs.grade_id));
+    }
+
+    return scope.isUnrestricted ? classSections : scope.classSections;
+  }, [viewingTeacherId, viewingTeacher, staffAssignments, classSections, grades, scope]);
+
+  const viewingTeacherSubjects = useMemo(() => {
+    if (activeRole === 'teacher' && viewingTeacher?.primary_subject_id) {
+      const primary = subjects.find((s) => s.id === viewingTeacher.primary_subject_id);
+      if (primary) return [primary];
+    }
+    return subjects;
+  }, [activeRole, viewingTeacher, subjects]);
 
   const teacherSlotsMap = useMemo(() => {
     const map = new Map<string, TimetableSlot>();
@@ -157,18 +216,26 @@ export const TimetableSubstitutionModule: React.FC = () => {
     }
 
     if (existing) {
-      await supabase
+      const { error } = await supabase
         .from('timetable_slots')
         .update({ class_section_id: cellClassId, subject_id: cellSubjectId })
         .eq('id', existing.id);
+      if (error) {
+        setCellError(error.message);
+        return;
+      }
     } else {
-      await supabase.from('timetable_slots').insert({
+      const { error } = await supabase.from('timetable_slots').insert({
         teacher_id: viewingTeacherId,
         class_section_id: cellClassId,
         subject_id: cellSubjectId,
         day_of_week: editingCell.day,
         period_number: editingCell.period,
       });
+      if (error) {
+        setCellError(error.message);
+        return;
+      }
     }
 
     setEditingCell(null);
@@ -226,10 +293,15 @@ export const TimetableSubstitutionModule: React.FC = () => {
     await loadAll();
   };
 
-  const selectedDateAbsences = useMemo(
-    () => absences.filter((a) => a.absence_date === absenceDate),
-    [absences, absenceDate]
-  );
+  const selectedDateAbsences = useMemo(() => {
+    const byDate = absences.filter((a) => a.absence_date === absenceDate);
+    if (!canManageAll) {
+      return byDate.filter((a) => a.teacher_id === userProfile?.id);
+    }
+    if (scope.isUnrestricted) return byDate;
+    const allowedIds = new Set(teachersList.map((t) => t.id));
+    return byDate.filter((a) => allowedIds.has(a.teacher_id));
+  }, [absences, absenceDate, canManageAll, userProfile, scope.isUnrestricted, teachersList]);
 
   const selectedDateWeekday = useMemo(
     () => getIsoWeekdayFromDateStr(absenceDate),
@@ -255,14 +327,20 @@ export const TimetableSubstitutionModule: React.FC = () => {
       .eq('period_number', slot.period_number)
       .eq('class_section_id', slot.class_section_id);
 
-    await supabase.from('substitutions').insert({
+    const { error } = await supabase.from('substitutions').insert({
       absence_id: absence.id,
       absence_date: absence.absence_date,
       period_number: slot.period_number,
       class_section_id: slot.class_section_id,
+      original_teacher_id: absence.teacher_id,
       substitute_teacher_id: substituteTeacherId,
       assigned_by: userProfile.id,
     });
+
+    if (error) {
+      setAbsenceError(error.message);
+      return;
+    }
 
     setAssignModal(null);
     await loadAll();
@@ -683,7 +761,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   <option value="">
                     {lang === 'ar' ? '-- اختر الفصل --' : '-- Select Class --'}
                   </option>
-                  {classSections.map((cs) => (
+                  {viewingTeacherClassSections.map((cs) => (
                     <option key={cs.id} value={cs.id}>
                       {getLocalizedDisplayName(cs, lang)}
                     </option>
@@ -701,7 +779,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   onChange={(e) => setCellSubjectId(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
                 >
-                  {subjects.map((s) => (
+                  {viewingTeacherSubjects.map((s) => (
                     <option key={s.id} value={s.id}>
                       {getLocalizedName(s, lang)}
                     </option>

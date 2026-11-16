@@ -5,30 +5,53 @@ import { supabase } from '../lib/supabase';
 import type { Notice, NoticePriority } from '../types/database';
 import { getLocalizedName, getLocalizedNotice } from '../utils/i18n';
 import { getRiyadhParts } from '../utils/riyadhTime';
-import { isDateInRange } from '../utils/schoolRules';
+import { getRoleScope, isDateInRange } from '../utils/schoolRules';
 
 export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
   onOpenManager,
 }) => {
-  const { lang, notices, divisions, userProfile } = useApp();
+  const {
+    lang,
+    notices,
+    divisions,
+    grades,
+    sections,
+    classSections,
+    staffAssignments,
+    students,
+    userProfile,
+  } = useApp();
   const [activeIndex, setActiveIndex] = useState(0);
 
   const todayRiyadh = useMemo(() => getRiyadhParts(new Date()).dateStr, []);
+  const scope = useMemo(
+    () =>
+      getRoleScope({
+        profile: userProfile,
+        divisions,
+        grades,
+        sections,
+        classSections,
+        staffAssignments,
+        students,
+      }),
+    [userProfile, divisions, grades, sections, classSections, staffAssignments, students]
+  );
 
   const activeNotices = useMemo(() => {
     return notices.filter((n) => {
       if (!isDateInRange(todayRiyadh, n.start_date, n.end_date)) return false;
       if (
+        !scope.isUnrestricted &&
         n.target_division_id &&
-        userProfile?.division_id &&
-        n.target_division_id !== userProfile.division_id &&
-        userProfile.active_role !== 'admin'
+        scope.divisionIds.size > 0 &&
+        !scope.divisionIds.has(n.target_division_id)
       ) {
         return false;
       }
       return true;
     });
-  }, [notices, todayRiyadh, userProfile]);
+  }, [notices, todayRiyadh, scope]);
 
   const canPublish =
     userProfile?.active_role === 'principal' ||

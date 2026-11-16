@@ -1,9 +1,11 @@
 import type {
   BehaviorLog,
   ClassSection,
+  Division,
   Grade,
   Profile,
   Section,
+  StaffClassAssignment,
   Student,
   Substitution,
   TeacherAbsence,
@@ -330,4 +332,193 @@ export function parseStudentExcelRows(
   }
 
   return { validRows, errors };
+}
+
+export interface RoleScope {
+  isUnrestricted: boolean;
+  classSections: ClassSection[];
+  classSectionIds: Set<string>;
+  grades: Grade[];
+  gradeIds: Set<string>;
+  sections: Section[];
+  sectionIds: Set<string>;
+  divisions: Division[];
+  divisionIds: Set<string>;
+  students: Student[];
+}
+
+/**
+ * Computes the strict operational scope (divisions, grades, sections, class sections, students)
+ * for the user's active role:
+ * - admin: unrestricted across entire school
+ * - principal / academic_supervisor: scoped strictly to their assigned division_id
+ * - teacher / supervisor: scoped strictly to their assigned staff_class_assignments
+ *   (falling back to division_id only if they have zero explicit class assignments)
+ */
+export function getRoleScope(params: {
+  profile: Profile | null;
+  divisions: Division[];
+  grades: Grade[];
+  sections: Section[];
+  classSections: ClassSection[];
+  staffAssignments: StaffClassAssignment[];
+  students: Student[];
+}): RoleScope {
+  const { profile, divisions, grades, sections, classSections, staffAssignments, students } = params;
+
+  if (!profile || profile.active_role === 'admin') {
+    const classSectionIds = new Set(classSections.map((c) => c.id));
+    const gradeIds = new Set(grades.map((g) => g.id));
+    const sectionIds = new Set(sections.map((s) => s.id));
+    const divisionIds = new Set(divisions.map((d) => d.id));
+    return {
+      isUnrestricted: true,
+      classSections,
+      classSectionIds,
+      grades,
+      gradeIds,
+      sections,
+      sectionIds,
+      divisions,
+      divisionIds,
+      students,
+    };
+  }
+
+  const activeRole = profile.active_role;
+  const gradeDivMap = new Map(grades.map((g) => [g.id, g.division_id]));
+
+  if (activeRole === 'principal' || activeRole === 'academic_supervisor') {
+    if (profile.division_id) {
+      const scopedGrades = grades.filter((g) => g.division_id === profile.division_id);
+      const scopedGradeIds = new Set(scopedGrades.map((g) => g.id));
+      const scopedClassSections = classSections.filter((cs) => scopedGradeIds.has(cs.grade_id));
+      const scopedClassIds = new Set(scopedClassSections.map((cs) => cs.id));
+      const scopedSectionIds = new Set(scopedClassSections.map((cs) => cs.section_id));
+      const scopedSections = sections.filter((s) => scopedSectionIds.has(s.id));
+      const scopedDivisions = divisions.filter((d) => d.id === profile.division_id);
+      const scopedDivisionIds = new Set(scopedDivisions.map((d) => d.id));
+      const scopedStudents = students.filter(
+        (st) => scopedClassIds.has(st.class_section_id) || scopedGradeIds.has(st.grade_id)
+      );
+      return {
+        isUnrestricted: false,
+        classSections: scopedClassSections,
+        classSectionIds: scopedClassIds,
+        grades: scopedGrades,
+        gradeIds: scopedGradeIds,
+        sections: scopedSections,
+        sectionIds: scopedSectionIds,
+        divisions: scopedDivisions,
+        divisionIds: scopedDivisionIds,
+        students: scopedStudents,
+      };
+    }
+  }
+
+  if (activeRole === 'teacher' || activeRole === 'supervisor') {
+    const userAssignments = staffAssignments.filter((a) => a.user_id === profile.id);
+    const typedAssignments = userAssignments.filter((a) => a.assignment_type === activeRole);
+    const effectiveAssignments = typedAssignments.length > 0 ? typedAssignments : userAssignments;
+    const assignedIds = new Set(effectiveAssignments.map((a) => a.class_section_id));
+
+    let scopedClassSections: ClassSection[];
+    if (assignedIds.size > 0) {
+      scopedClassSections = classSections.filter((cs) => assignedIds.has(cs.id));
+    } else if (profile.division_id) {
+      const divGradeIds = new Set(
+        grades.filter((g) => g.division_id === profile.division_id).map((g) => g.id)
+      );
+      scopedClassSections = classSections.filter((cs) => divGradeIds.has(cs.grade_id));
+    } else {
+      scopedClassSections = [];
+    }
+
+    const scopedClassIds = new Set(scopedClassSections.map((cs) => cs.id));
+    const scopedGradeIds = new Set(scopedClassSections.map((cs) => cs.grade_id));
+    const scopedSectionIds = new Set(scopedClassSections.map((cs) => cs.section_id));
+    const scopedDivisionIds = new Set<string>();
+    for (const gid of scopedGradeIds) {
+      const did = gradeDivMap.get(gid);
+      if (did) scopedDivisionIds.add(did);
+    }
+    if (scopedDivisionIds.size === 0 && profile.division_id) {
+      scopedDivisionIds.add(profile.division_id);
+    }
+
+    const scopedGrades = grades.filter((g) => scopedGradeIds.has(g.id));
+    const scopedSections = sections.filter((s) => scopedSectionIds.has(s.id));
+    const scopedDivisions = divisions.filter((d) => scopedDivisionIds.has(d.id));
+    const scopedStudents = students.filter((st) => scopedClassIds.has(st.class_section_id));
+
+    return {
+      isUnrestricted: false,
+      classSections: scopedClassSections,
+      classSectionIds: scopedClassIds,
+      grades: scopedGrades,
+      gradeIds: scopedGradeIds,
+      sections: scopedSections,
+      sectionIds: scopedSectionIds,
+      divisions: scopedDivisions,
+      divisionIds: scopedDivisionIds,
+      students: scopedStudents,
+    };
+  }
+
+  // Fallback for principal/academic_supervisor without division_id set
+  const classSectionIds = new Set(classSections.map((c) => c.id));
+  const gradeIds = new Set(grades.map((g) => g.id));
+  const sectionIds = new Set(sections.map((s) => s.id));
+  const divisionIds = new Set(divisions.map((d) => d.id));
+  return {
+    isUnrestricted: true,
+    classSections,
+    classSectionIds,
+    grades,
+    gradeIds,
+    sections,
+    sectionIds,
+    divisions,
+    divisionIds,
+    students,
+  };
+}
+
+/**
+ * Filters teachers relevant to a user's operational scope (division / assigned class sections).
+ */
+export function filterTeachersInScope(params: {
+  profiles: Profile[];
+  scope: RoleScope;
+  staffAssignments: StaffClassAssignment[];
+  timetableSlots?: TimetableSlot[];
+}): Profile[] {
+  const { profiles, scope, staffAssignments, timetableSlots = [] } = params;
+  const teachers = profiles.filter((p) => p.roles.includes('teacher'));
+  if (scope.isUnrestricted || scope.classSectionIds.size === 0) return teachers;
+
+  const teacherClasses = new Map<string, Set<string>>();
+  const addClass = (tid: string, csid: string) => {
+    const set = teacherClasses.get(tid) || new Set<string>();
+    set.add(csid);
+    teacherClasses.set(tid, set);
+  };
+  for (const a of staffAssignments) addClass(a.user_id, a.class_section_id);
+  for (const s of timetableSlots) addClass(s.teacher_id, s.class_section_id);
+
+  const matched = teachers.filter((t) => {
+    const classes = teacherClasses.get(t.id);
+    if (classes && classes.size > 0) {
+      for (const csid of classes) {
+        if (scope.classSectionIds.has(csid)) return true;
+      }
+      return false;
+    }
+    if (t.division_id && scope.divisionIds.size > 0) {
+      return scope.divisionIds.has(t.division_id);
+    }
+    return true;
+  });
+
+  return matched.length > 0 ? matched : teachers;
 }

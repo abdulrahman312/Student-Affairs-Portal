@@ -68,11 +68,11 @@ All structural, academic, schedule, and lookup data lives in Supabase PostgreSQL
 ### Operational Modules
 - `notices` (`id, title_en, title_ar, content_en, content_ar, priority ['normal'|'important'|'urgent'], target_division_id -> divisions.id | null, start_date, end_date, published_by -> profiles.id, created_at`)
 - `behavior_logs` (`id, student_id -> students.id, teacher_id -> profiles.id, class_section_id -> class_sections.id, subject_id -> subjects.id, behavior_category_id -> behavior_categories.id, period_number, notes, created_at`)
-- `performance_requests` (`id, student_id -> students.id, requested_by -> profiles.id, request_date, status, created_at`)
+- `performance_requests` (`id, student_id -> students.id, requested_by -> profiles.id, request_date, status ['pending' | 'completed'], created_at`)
 - `performance_comments` (`id, request_id -> performance_requests.id, subject_id -> subjects.id, teacher_id -> profiles.id, comment_text, is_submitted, submitted_at`)
 - `timetable_slots` (`id, teacher_id -> profiles.id, class_section_id -> class_sections.id, subject_id -> subjects.id, day_of_week [0=Sun..4=Thu], period_number [1..7], created_at`)
 - `teacher_absences` (`id, teacher_id -> profiles.id, absence_date, reason, marked_by -> profiles.id, created_at`)
-- `substitutions` (`id, absence_id -> teacher_absences.id, absence_date, period_number, class_section_id -> class_sections.id, substitute_teacher_id -> profiles.id, assigned_by -> profiles.id, created_at`)
+- `substitutions` (`id, absence_id -> teacher_absences.id, absence_date, period_number, class_section_id -> class_sections.id, original_teacher_id -> profiles.id, substitute_teacher_id -> profiles.id, assigned_by -> profiles.id, created_at`)
 - `duty_assignments` (`id, teacher_id -> profiles.id, duty_type_id -> duty_types.id, start_date, end_date, location_text, assigned_by -> profiles.id, created_at`)
 
 ---

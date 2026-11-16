@@ -5,10 +5,21 @@ import { supabase } from '../lib/supabase';
 import type { DutyAssignment } from '../types/database';
 import { getLocalizedName, tr } from '../utils/i18n';
 import { getRiyadhParts } from '../utils/riyadhTime';
-import { isDateInRange } from '../utils/schoolRules';
+import { filterTeachersInScope, getRoleScope, isDateInRange } from '../utils/schoolRules';
 
 export const DutyModule: React.FC = () => {
-  const { lang, userProfile, dutyTypes, profiles } = useApp();
+  const {
+    lang,
+    userProfile,
+    divisions,
+    grades,
+    sections,
+    classSections,
+    staffAssignments,
+    students,
+    dutyTypes,
+    profiles,
+  } = useApp();
   const riyadhToday = getRiyadhParts(new Date()).dateStr;
 
   const [duties, setDuties] = useState<DutyAssignment[]>([]);
@@ -26,9 +37,23 @@ export const DutyModule: React.FC = () => {
   const activeRole = userProfile?.active_role || 'teacher';
   const canAssign = activeRole !== 'teacher';
 
+  const scope = useMemo(
+    () =>
+      getRoleScope({
+        profile: userProfile,
+        divisions,
+        grades,
+        sections,
+        classSections,
+        staffAssignments,
+        students,
+      }),
+    [userProfile, divisions, grades, sections, classSections, staffAssignments, students]
+  );
+
   const teachersList = useMemo(
-    () => profiles.filter((p) => p.roles.includes('teacher')),
-    [profiles]
+    () => filterTeachersInScope({ profiles, scope, staffAssignments }),
+    [profiles, scope, staffAssignments]
   );
 
   const loadDuties = async () => {
@@ -61,9 +86,13 @@ export const DutyModule: React.FC = () => {
   }, [duties, userProfile, riyadhToday]);
 
   const visibleDuties = useMemo(() => {
-    if (canAssign) return duties;
-    return duties.filter((d) => d.teacher_id === userProfile?.id);
-  }, [duties, canAssign, userProfile]);
+    if (!canAssign) return duties.filter((d) => d.teacher_id === userProfile?.id);
+    if (scope.isUnrestricted) return duties;
+    const allowedTeacherIds = new Set(teachersList.map((t) => t.id));
+    return duties.filter(
+      (d) => allowedTeacherIds.has(d.teacher_id) || d.assigned_by === userProfile?.id
+    );
+  }, [duties, canAssign, userProfile, scope.isUnrestricted, teachersList]);
 
   const handleAssignDuty = async (e: React.FormEvent) => {
     e.preventDefault();

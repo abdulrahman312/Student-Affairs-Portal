@@ -19,7 +19,12 @@ import type {
 } from '../types/database';
 import { getLocalizedDisplayName, getLocalizedName, ROLE_LABELS } from '../utils/i18n';
 import { getRiyadhParts } from '../utils/riyadhTime';
-import { computeBehaviorWatchlist, isDateInRange } from '../utils/schoolRules';
+import {
+  computeBehaviorWatchlist,
+  filterTeachersInScope,
+  getRoleScope,
+  isDateInRange,
+} from '../utils/schoolRules';
 import type { NavTab } from './LayoutShell';
 import { ActiveNoticeBanner } from './NoticeBoardSection';
 
@@ -33,9 +38,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
     userProfile,
     schoolSettings,
     divisions,
+    grades,
+    sections,
     timeslots,
     students,
     classSections,
+    staffAssignments,
     behaviorCategories,
     dutyTypes,
     profiles,
@@ -74,6 +82,26 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
 
   const activeRole = userProfile.active_role;
   const threshold = schoolSettings?.high_behavior_threshold ?? 3;
+  const scope = useMemo(
+    () =>
+      getRoleScope({
+        profile: userProfile,
+        divisions,
+        grades,
+        sections,
+        classSections,
+        staffAssignments,
+        students,
+      }),
+    [userProfile, divisions, grades, sections, classSections, staffAssignments, students]
+  );
+
+  const scopedTeachers = useMemo(
+    () => filterTeachersInScope({ profiles, scope, staffAssignments }),
+    [profiles, scope, staffAssignments]
+  );
+
+  const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const classMap = useMemo(() => new Map(classSections.map((c) => [c.id, c])), [classSections]);
   const catMap = useMemo(
     () => new Map(behaviorCategories.map((c) => [c.id, c])),
@@ -82,13 +110,41 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
   const dutyMap = useMemo(() => new Map(dutyTypes.map((d) => [d.id, d])), [dutyTypes]);
   const profMap = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
 
+  const scopedBehaviorLogs = useMemo(() => {
+    if (scope.isUnrestricted) return behaviorLogs;
+    if (activeRole === 'teacher') {
+      return behaviorLogs.filter(
+        (b) =>
+          scope.classSectionIds.has(b.class_section_id) ||
+          (scope.classSectionIds.size === 0 && b.teacher_id === userProfile.id)
+      );
+    }
+    return behaviorLogs.filter((b) => scope.classSectionIds.has(b.class_section_id));
+  }, [behaviorLogs, scope, activeRole, userProfile.id]);
+
   const todaysBehaviors = useMemo(
     () =>
-      behaviorLogs.filter(
+      scopedBehaviorLogs.filter(
         (b) => getRiyadhParts(new Date(b.created_at)).dateStr === riyadhToday
       ),
-    [behaviorLogs, riyadhToday]
+    [scopedBehaviorLogs, riyadhToday]
   );
+
+  const scopedPerfRequests = useMemo(() => {
+    if (scope.isUnrestricted) return perfRequests;
+    return perfRequests.filter((r) => {
+      const st = studentMap.get(r.student_id);
+      return st
+        ? scope.classSectionIds.has(st.class_section_id) || scope.gradeIds.has(st.grade_id)
+        : false;
+    });
+  }, [perfRequests, scope, studentMap]);
+
+  const scopedAbsences = useMemo(() => {
+    if (scope.isUnrestricted) return absences;
+    const allowedTeacherIds = new Set(scopedTeachers.map((t) => t.id));
+    return absences.filter((a) => allowedTeacherIds.has(a.teacher_id));
+  }, [absences, scope.isUnrestricted, scopedTeachers]);
 
   const myPendingComments = useMemo(
     () => perfComments.filter((c) => c.teacher_id === userProfile.id && !c.is_submitted),
@@ -112,14 +168,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
   const watchlistPreview = useMemo(
     () =>
       computeBehaviorWatchlist({
-        logs: behaviorLogs,
-        students,
+        logs: scopedBehaviorLogs,
+        students: scope.students,
         timeframe: 'month',
         riyadhToday,
         threshold,
       }).slice(0, 5),
-    [behaviorLogs, students, riyadhToday, threshold]
+    [scopedBehaviorLogs, scope.students, riyadhToday, threshold]
   );
+
+  const visibleDivisions = scope.divisions.length > 0 ? scope.divisions : divisions;
 
   return (
     <div className="space-y-6">
@@ -177,10 +235,20 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="meis-glass rounded-2xl p-4">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>{lang === 'ar' ? 'إجمالي الطلاب' : 'Enrolled Students'}</span>
+            <span>
+              {scope.isUnrestricted
+                ? lang === 'ar'
+                  ? 'إجمالي الطلاب'
+                  : 'Enrolled Students'
+                : lang === 'ar'
+                  ? 'طلاب فصلي / مرحلتي'
+                  : 'Assigned Students'}
+            </span>
             <Users className="w-4 h-4 text-sky-600" />
           </div>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">{students.length}</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">
+            {scope.students.length}
+          </p>
         </div>
 
         <div className="meis-glass rounded-2xl p-4">
@@ -207,7 +275,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">
-            {activeRole === 'teacher' ? myPendingComments.length : perfRequests.length}
+            {activeRole === 'teacher' ? myPendingComments.length : scopedPerfRequests.length}
           </p>
         </div>
 
@@ -225,7 +293,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
             <CalendarClock className="w-4 h-4 text-indigo-600" />
           </div>
           <p className="text-2xl font-bold text-slate-900 tabular-nums mt-2">
-            {activeRole === 'teacher' ? myDutiesToday.length : absences.length}
+            {activeRole === 'teacher' ? myDutiesToday.length : scopedAbsences.length}
           </p>
         </div>
       </div>
@@ -391,7 +459,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
           </div>
 
           <div className="mt-4 space-y-4">
-            {divisions.map((div) => {
+            {visibleDivisions.map((div) => {
               const divSlots = timeslots
                 .filter((t) => t.division_id === div.id)
                 .sort((a, b) => a.sort_order - b.sort_order);
@@ -419,13 +487,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
               );
             })}
 
-            {activeRole !== 'teacher' && absences.length > 0 && (
+            {activeRole !== 'teacher' && scopedAbsences.length > 0 && (
               <div className="pt-3 border-t border-slate-200/80">
                 <p className="text-xs font-bold text-slate-800 mb-1.5">
                   {lang === 'ar' ? 'المعلمون الغائبون اليوم' : 'Absent Teachers Today'}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {absences.map((a) => (
+                  {scopedAbsences.map((a) => (
                     <span
                       key={a.id}
                       className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg"

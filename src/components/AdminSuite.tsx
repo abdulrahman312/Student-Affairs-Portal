@@ -45,6 +45,8 @@ const ALL_ROLES: UserRole[] = [
 export const AdminSuite: React.FC = () => {
   const {
     lang,
+    userProfile,
+    realAdminProfile,
     schoolSettings,
     divisions,
     grades,
@@ -82,8 +84,23 @@ export const AdminSuite: React.FC = () => {
   const [dummySubject, setDummySubject] = useState('');
   const [dummyDivision, setDummyDivision] = useState('');
   const [dummyClasses, setDummyClasses] = useState<string[]>([]);
-  const [userActionMsg, setUserActionMsg] = useState<string | null>(null);
+  const [userActionMsg, setUserActionMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(
+    null
+  );
   const [editUserError, setEditUserError] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
+  const [deletingUserLoading, setDeletingUserLoading] = useState(false);
+
+  const groupedClassSections = useMemo(() => {
+    return grades
+      .slice()
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((grade) => ({
+        grade,
+        items: classSections.filter((cs) => cs.grade_id === grade.id),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [grades, classSections]);
 
   const openEditUser = (p: Profile) => {
     setEditingUser(p);
@@ -177,7 +194,7 @@ export const AdminSuite: React.FC = () => {
     });
 
     if (error) {
-      setUserActionMsg(error.message);
+      setUserActionMsg({ type: 'err', text: error.message });
       return;
     }
 
@@ -192,7 +209,7 @@ export const AdminSuite: React.FC = () => {
         }))
       );
       if (assignErr) {
-        setUserActionMsg(assignErr.message);
+        setUserActionMsg({ type: 'err', text: assignErr.message });
         return;
       }
     }
@@ -202,12 +219,73 @@ export const AdminSuite: React.FC = () => {
     setDummyNameAr('');
     setDummyNameEn('');
     setDummyClasses([]);
-    setUserActionMsg(
-      lang === 'ar'
-        ? 'تم إنشاء الحساب التجريبي بنجاح ويمكن تسجيل الدخول به فوراً.'
-        : 'Dummy test account created and ready for instant login or impersonation.'
-    );
+    setUserActionMsg({
+      type: 'ok',
+      text:
+        lang === 'ar'
+          ? 'تم إنشاء الحساب التجريبي بنجاح ويمكن تسجيل الدخول به فوراً.'
+          : 'Dummy test account created and ready for instant login or impersonation.',
+    });
     await refreshMasterData();
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+    const targetId = deletingUser.id;
+    if (targetId === userProfile?.id || targetId === realAdminProfile?.id) return;
+
+    setDeletingUserLoading(true);
+    setUserActionMsg(null);
+    try {
+      await supabase.from('staff_class_assignments').delete().eq('user_id', targetId);
+      await supabase.from('timetable_slots').delete().eq('teacher_id', targetId);
+      await supabase
+        .from('substitutions')
+        .delete()
+        .or(
+          `original_teacher_id.eq.${targetId},substitute_teacher_id.eq.${targetId},assigned_by.eq.${targetId}`
+        );
+      await supabase
+        .from('teacher_absences')
+        .delete()
+        .or(`teacher_id.eq.${targetId},marked_by.eq.${targetId}`);
+      await supabase
+        .from('duty_assignments')
+        .delete()
+        .or(`teacher_id.eq.${targetId},assigned_by.eq.${targetId}`);
+      await supabase.from('behavior_logs').delete().eq('teacher_id', targetId);
+      await supabase.from('performance_comments').delete().eq('teacher_id', targetId);
+
+      const { data: userReqs } = await supabase
+        .from('performance_requests')
+        .select('id')
+        .eq('requested_by', targetId);
+      if (userReqs && userReqs.length > 0) {
+        const reqIds = userReqs.map((r: { id: string }) => r.id);
+        await supabase.from('performance_comments').delete().in('request_id', reqIds);
+        await supabase.from('performance_requests').delete().in('id', reqIds);
+      }
+
+      await supabase.from('notices').update({ published_by: null }).eq('published_by', targetId);
+
+      const { error: delProfErr } = await supabase.from('profiles').delete().eq('id', targetId);
+      if (delProfErr) {
+        setUserActionMsg({ type: 'err', text: delProfErr.message });
+        return;
+      }
+
+      setUserActionMsg({
+        type: 'ok',
+        text:
+          lang === 'ar'
+            ? `تم حذف المستخدم (${deletingUser.email}) وجميع بياناته من النظام بنجاح.`
+            : `User (${deletingUser.email}) and their associated records were completely deleted.`,
+      });
+      setDeletingUser(null);
+      await refreshMasterData();
+    } finally {
+      setDeletingUserLoading(false);
+    }
   };
 
   const filteredProfiles = useMemo(() => {
@@ -538,8 +616,14 @@ export const AdminSuite: React.FC = () => {
           </div>
 
           {userActionMsg && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
-              {userActionMsg}
+            <div
+              className={`p-3 rounded-xl border text-xs font-semibold ${
+                userActionMsg.type === 'err'
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              }`}
+            >
+              {userActionMsg.text}
             </div>
           )}
 
@@ -565,48 +649,62 @@ export const AdminSuite: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredProfiles.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/70">
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">
-                      {getLocalizedName(p, lang)}
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-xs text-slate-600">{p.email}</td>
-                    <td className="py-2.5 px-3 text-xs text-slate-700">
-                      {p.roles.map((r) => ROLE_LABELS[r]?.[lang] || r).join(' · ')}
-                    </td>
-                    <td className="py-2.5 px-3 text-xs">
-                      {p.is_dummy ? (
-                        <span className="text-amber-700 font-semibold">
-                          {lang === 'ar' ? 'حساب تجريبي' : 'Dummy'}
-                        </span>
-                      ) : (
-                        <span className="text-emerald-700 font-semibold">
-                          {lang === 'ar' ? 'رسمي' : 'Official'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-end">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void impersonateProfile(p.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
-                        >
-                          <UserCheck className="w-3.5 h-3.5" />
-                          <span>{lang === 'ar' ? 'تقمص الدور' : 'Impersonate'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openEditUser(p)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>{tr('edit', lang)}</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filteredProfiles.map((p) => {
+                  const isSelf = p.id === userProfile?.id || p.id === realAdminProfile?.id;
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/70">
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                        {getLocalizedName(p, lang)}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-xs text-slate-600">{p.email}</td>
+                      <td className="py-2.5 px-3 text-xs text-slate-700">
+                        {p.roles.map((r) => ROLE_LABELS[r]?.[lang] || r).join(' · ')}
+                      </td>
+                      <td className="py-2.5 px-3 text-xs">
+                        {p.is_dummy ? (
+                          <span className="text-amber-700 font-semibold">
+                            {lang === 'ar' ? 'حساب تجريبي' : 'Dummy'}
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold">
+                            {lang === 'ar' ? 'رسمي' : 'Official'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-end">
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void impersonateProfile(p.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>{lang === 'ar' ? 'تقمص الدور' : 'Impersonate'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditUser(p)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>{tr('edit', lang)}</span>
+                          </button>
+                          {!isSelf && (
+                            <button
+                              type="button"
+                              aria-label={`Delete ${p.email}`}
+                              onClick={() => setDeletingUser(p)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-700 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{tr('delete', lang)}</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1239,31 +1337,72 @@ export const AdminSuite: React.FC = () => {
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-slate-700 mb-2">
-                  {lang === 'ar' ? 'الفصول المسندة' : 'Assigned Class Sections'}
-                </p>
-                <div className="max-h-40 overflow-y-auto flex flex-wrap gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200">
-                  {classSections.map((cs) => {
-                    const active = editUserClasses.includes(cs.id);
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-slate-700">
+                    {lang === 'ar'
+                      ? 'الفصول المسندة (تحدد الصفوف والطلاب الظاهرين للمعلم / المشرف)'
+                      : 'Assigned Class Sections (controls visible grades & students for Teacher/Supervisor)'}
+                  </p>
+                  <span className="text-xs font-semibold text-emerald-700 tabular-nums">
+                    {editUserClasses.length} {lang === 'ar' ? 'محدد' : 'selected'}
+                  </span>
+                </div>
+                <div className="max-h-56 overflow-y-auto space-y-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  {groupedClassSections.map(({ grade, items }) => {
+                    const itemIds = items.map((i) => i.id);
+                    const allSelected = itemIds.every((id) => editUserClasses.includes(id));
                     return (
-                      <button
-                        key={cs.id}
-                        type="button"
-                        onClick={() =>
-                          setEditUserClasses((prev) =>
-                            prev.includes(cs.id)
-                              ? prev.filter((x) => x !== cs.id)
-                              : [...prev, cs.id]
-                          )
-                        }
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
-                          active
-                            ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-white text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {getLocalizedDisplayName(cs, lang)}
-                      </button>
+                      <div key={grade.id} className="p-2.5 rounded-lg bg-white border border-slate-200/80">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-800">
+                            {getLocalizedName(grade, lang)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditUserClasses((prev) =>
+                                allSelected
+                                  ? prev.filter((id) => !itemIds.includes(id))
+                                  : Array.from(new Set([...prev, ...itemIds]))
+                              )
+                            }
+                            className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                          >
+                            {allSelected
+                              ? lang === 'ar'
+                                ? 'إلغاء الصف'
+                                : 'Clear Grade'
+                              : lang === 'ar'
+                                ? 'تحديد كل الصف'
+                                : 'Select All Grade'}
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {items.map((cs) => {
+                            const active = editUserClasses.includes(cs.id);
+                            return (
+                              <button
+                                key={cs.id}
+                                type="button"
+                                onClick={() =>
+                                  setEditUserClasses((prev) =>
+                                    prev.includes(cs.id)
+                                      ? prev.filter((x) => x !== cs.id)
+                                      : [...prev, cs.id]
+                                  )
+                                }
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                  active
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-white text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                {getLocalizedDisplayName(cs, lang)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -1410,28 +1549,62 @@ export const AdminSuite: React.FC = () => {
                 </select>
               </div>
 
-              <div className="max-h-36 overflow-y-auto flex flex-wrap gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200">
-                {classSections.map((cs) => {
-                  const active = dummyClasses.includes(cs.id);
+              <div className="max-h-48 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                {groupedClassSections.map(({ grade, items }) => {
+                  const itemIds = items.map((i) => i.id);
+                  const allSelected = itemIds.every((id) => dummyClasses.includes(id));
                   return (
-                    <button
-                      key={cs.id}
-                      type="button"
-                      onClick={() =>
-                        setDummyClasses((prev) =>
-                          prev.includes(cs.id)
-                            ? prev.filter((x) => x !== cs.id)
-                            : [...prev, cs.id]
-                        )
-                      }
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
-                        active
-                          ? 'bg-emerald-600 text-white border-emerald-600'
-                          : 'bg-white text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {getLocalizedDisplayName(cs, lang)}
-                    </button>
+                    <div key={grade.id} className="p-2 rounded-lg bg-white border border-slate-200/80">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-slate-800">
+                          {getLocalizedName(grade, lang)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDummyClasses((prev) =>
+                              allSelected
+                                ? prev.filter((id) => !itemIds.includes(id))
+                                : Array.from(new Set([...prev, ...itemIds]))
+                            )
+                          }
+                          className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          {allSelected
+                            ? lang === 'ar'
+                              ? 'إلغاء الصف'
+                              : 'Clear'
+                            : lang === 'ar'
+                              ? 'تحديد الصف'
+                              : 'Select Grade'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {items.map((cs) => {
+                          const active = dummyClasses.includes(cs.id);
+                          return (
+                            <button
+                              key={cs.id}
+                              type="button"
+                              onClick={() =>
+                                setDummyClasses((prev) =>
+                                  prev.includes(cs.id)
+                                    ? prev.filter((x) => x !== cs.id)
+                                    : [...prev, cs.id]
+                                )
+                              }
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                active
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-white text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {getLocalizedDisplayName(cs, lang)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -1453,6 +1626,62 @@ export const AdminSuite: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Complete Delete User Modal */}
+      {deletingUser && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-red-700">
+                  {lang === 'ar' ? 'تأكيد حذف المستخدم نهائياً' : 'Confirm Complete User Deletion'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 font-mono">{deletingUser.email}</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close delete confirmation"
+                onClick={() => setDeletingUser(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-700 leading-relaxed">
+              {lang === 'ar'
+                ? `هل أنت متأكد من حذف (${getLocalizedName(deletingUser, lang)})؟ سيتم حذف الملف الشخصي والفصول المعينة والجدول والمناوبات وسجلاته من النظام بالكامل ولا يمكن التراجع عن هذا الإجراء.`
+                : `Permanently delete ${getLocalizedName(deletingUser, lang)}? This removes their profile, class assignments, timetable slots, duty assignments, absences/substitutions, and associated records from the system.`}
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deletingUserLoading}
+                onClick={() => setDeletingUser(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+              >
+                {tr('cancel', lang)}
+              </button>
+              <button
+                type="button"
+                disabled={deletingUserLoading}
+                onClick={() => void handleDeleteUser()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>
+                  {deletingUserLoading
+                    ? tr('loading', lang)
+                    : lang === 'ar'
+                      ? 'حذف نهائي من النظام'
+                      : 'Delete Permanently'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       )}

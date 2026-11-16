@@ -18,6 +18,7 @@ import { getRiyadhParts } from '../utils/riyadhTime';
 import {
   buildWhatsAppUrl,
   computeBehaviorWatchlist,
+  getRoleScope,
   type WatchlistTimeframe,
 } from '../utils/schoolRules';
 
@@ -26,6 +27,7 @@ export const BehaviorModule: React.FC = () => {
     lang,
     userProfile,
     schoolSettings,
+    divisions,
     grades,
     sections,
     classSections,
@@ -41,7 +43,6 @@ export const BehaviorModule: React.FC = () => {
 
   // Record Incident Form State
   const [showRecordForm, setShowRecordForm] = useState(false);
-  const [useAllClasses, setUseAllClasses] = useState(false);
   const [recordClassId, setRecordClassId] = useState('');
   const [recordStudentId, setRecordStudentId] = useState('');
   const [recordCategoryId, setRecordCategoryId] = useState('');
@@ -77,22 +78,26 @@ export const BehaviorModule: React.FC = () => {
     void loadLogs();
   }, []);
 
-  const myAssignedClassIds = useMemo(() => {
-    if (!userProfile) return new Set<string>();
-    return new Set(
-      staffAssignments.filter((a) => a.user_id === userProfile.id).map((a) => a.class_section_id)
-    );
-  }, [staffAssignments, userProfile]);
+  const scope = useMemo(
+    () =>
+      getRoleScope({
+        profile: userProfile,
+        divisions,
+        grades,
+        sections,
+        classSections,
+        staffAssignments,
+        students,
+      }),
+    [userProfile, divisions, grades, sections, classSections, staffAssignments, students]
+  );
 
-  const availableRecordClasses = useMemo(() => {
-    if (useAllClasses || myAssignedClassIds.size === 0) return classSections;
-    return classSections.filter((cs) => myAssignedClassIds.has(cs.id));
-  }, [useAllClasses, myAssignedClassIds, classSections]);
+  const availableRecordClasses = scope.classSections;
 
   const studentsInSelectedClass = useMemo(() => {
-    if (!recordClassId) return [];
-    return students.filter((s) => s.class_section_id === recordClassId);
-  }, [students, recordClassId]);
+    if (!recordClassId || !scope.classSectionIds.has(recordClassId)) return [];
+    return scope.students.filter((s) => s.class_section_id === recordClassId);
+  }, [scope, recordClassId]);
 
   const activeCategories = useMemo(
     () => behaviorCategories.filter((c) => c.is_active),
@@ -110,28 +115,16 @@ export const BehaviorModule: React.FC = () => {
   const profMap = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
 
   const scopedLogs = useMemo(() => {
-    if (!userProfile) return logs;
-    if (activeRole === 'admin') return logs;
-    if (activeRole === 'supervisor' && myAssignedClassIds.size > 0) {
-      return logs.filter((l) => myAssignedClassIds.has(l.class_section_id));
-    }
-    if (
-      (activeRole === 'principal' || activeRole === 'academic_supervisor') &&
-      userProfile.division_id
-    ) {
-      const divGradeIds = new Set(
-        grades.filter((g) => g.division_id === userProfile.division_id).map((g) => g.id)
-      );
-      const divClassIds = new Set(
-        classSections.filter((cs) => divGradeIds.has(cs.grade_id)).map((cs) => cs.id)
-      );
-      return logs.filter((l) => divClassIds.has(l.class_section_id));
-    }
+    if (!userProfile || scope.isUnrestricted) return logs;
     if (activeRole === 'teacher') {
-      return logs.filter((l) => l.teacher_id === userProfile.id);
+      return logs.filter(
+        (l) =>
+          scope.classSectionIds.has(l.class_section_id) ||
+          (scope.classSectionIds.size === 0 && l.teacher_id === userProfile.id)
+      );
     }
-    return logs;
-  }, [logs, userProfile, activeRole, myAssignedClassIds, grades, classSections]);
+    return logs.filter((l) => scope.classSectionIds.has(l.class_section_id));
+  }, [logs, userProfile, activeRole, scope]);
 
   const todaysFeed = useMemo(() => {
     return scopedLogs.filter(
@@ -142,18 +135,22 @@ export const BehaviorModule: React.FC = () => {
   const watchlist = useMemo(() => {
     return computeBehaviorWatchlist({
       logs: scopedLogs,
-      students,
+      students: scope.students,
       timeframe,
       riyadhToday,
       threshold,
     });
-  }, [scopedLogs, students, timeframe, riyadhToday, threshold]);
+  }, [scopedLogs, scope.students, timeframe, riyadhToday, threshold]);
 
   const filteredStudents = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return students.filter((s) => {
-      if (filterGradeId && s.grade_id !== filterGradeId) return false;
-      if (filterSectionId && s.section_id !== filterSectionId) return false;
+    const activeGradeFilter =
+      filterGradeId && scope.gradeIds.has(filterGradeId) ? filterGradeId : '';
+    const activeSectionFilter =
+      filterSectionId && scope.sectionIds.has(filterSectionId) ? filterSectionId : '';
+    return scope.students.filter((s) => {
+      if (activeGradeFilter && s.grade_id !== activeGradeFilter) return false;
+      if (activeSectionFilter && s.section_id !== activeSectionFilter) return false;
       if (!q) return true;
       return (
         s.iqama_id.toLowerCase().includes(q) ||
@@ -161,7 +158,7 @@ export const BehaviorModule: React.FC = () => {
         s.name_ar.toLowerCase().includes(q)
       );
     });
-  }, [students, searchQuery, filterGradeId, filterSectionId]);
+  }, [scope, searchQuery, filterGradeId, filterSectionId]);
 
   const selectedStudentLogs = useMemo(() => {
     if (!selectedStudent) return [];
@@ -296,20 +293,12 @@ export const BehaviorModule: React.FC = () => {
             <h2 className="text-base font-bold text-slate-900">
               {lang === 'ar' ? 'تسجيل ملاحظة سلوكية جديدة' : 'New Behavior Incident Entry'}
             </h2>
-            {myAssignedClassIds.size > 0 && (
-              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useAllClasses}
-                  onChange={(e) => {
-                    setUseAllClasses(e.target.checked);
-                    setRecordClassId('');
-                    setRecordStudentId('');
-                  }}
-                  className="rounded border-slate-300"
-                />
-                <span>{lang === 'ar' ? 'إظهار جميع الفصول' : 'Show all school classes'}</span>
-              </label>
+            {!scope.isUnrestricted && availableRecordClasses.length === 0 && (
+              <span className="text-xs font-semibold text-amber-700">
+                {lang === 'ar'
+                  ? 'لا توجد فصول معينة لحسابك بعد — تواصل مع مدير النظام.'
+                  : 'No class sections assigned to your account yet.'}
+              </span>
             )}
           </div>
 
@@ -689,12 +678,12 @@ export const BehaviorModule: React.FC = () => {
 
           <select
             aria-label={lang === 'ar' ? 'تصفية حسب الصف' : 'Filter by Grade'}
-            value={filterGradeId}
+            value={scope.gradeIds.has(filterGradeId) ? filterGradeId : ''}
             onChange={(e) => setFilterGradeId(e.target.value)}
             className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
           >
-            <option value="">{lang === 'ar' ? 'جميع الصفوف' : 'All Grades'}</option>
-            {grades.map((g) => (
+            <option value="">{lang === 'ar' ? 'جميع الصفوف' : 'All Assigned Grades'}</option>
+            {scope.grades.map((g) => (
               <option key={g.id} value={g.id}>
                 {getLocalizedName(g, lang)}
               </option>
@@ -703,12 +692,12 @@ export const BehaviorModule: React.FC = () => {
 
           <select
             aria-label={lang === 'ar' ? 'تصفية حسب الشعبة' : 'Filter by Section'}
-            value={filterSectionId}
+            value={scope.sectionIds.has(filterSectionId) ? filterSectionId : ''}
             onChange={(e) => setFilterSectionId(e.target.value)}
             className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
           >
-            <option value="">{lang === 'ar' ? 'جميع الشعب' : 'All Sections'}</option>
-            {sections.map((s) => (
+            <option value="">{lang === 'ar' ? 'جميع الشعب' : 'All Assigned Sections'}</option>
+            {scope.sections.map((s) => (
               <option key={s.id} value={s.id}>
                 {getLocalizedName(s, lang)}
               </option>

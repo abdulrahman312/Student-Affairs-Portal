@@ -21,13 +21,14 @@ import type {
 import { getLocalizedDisplayName, getLocalizedName, tr } from '../utils/i18n';
 import { exportPerformanceReportPdf } from '../utils/pdfExport';
 import { getRiyadhParts } from '../utils/riyadhTime';
-import { buildWhatsAppUrl } from '../utils/schoolRules';
+import { buildWhatsAppUrl, getRoleScope } from '../utils/schoolRules';
 
 export const PerformanceModule: React.FC = () => {
   const {
     lang,
     userProfile,
     schoolSettings,
+    divisions,
     grades,
     sections,
     classSections,
@@ -48,7 +49,7 @@ export const PerformanceModule: React.FC = () => {
   const [reqSectionId, setReqSectionId] = useState('');
   const [reqStudentId, setReqStudentId] = useState('');
   const [creating, setCreating] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   // Teacher comment drafts
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -88,6 +89,20 @@ export const PerformanceModule: React.FC = () => {
     void loadData();
   }, []);
 
+  const scope = useMemo(
+    () =>
+      getRoleScope({
+        profile: userProfile,
+        divisions,
+        grades,
+        sections,
+        classSections,
+        staffAssignments,
+        students,
+      }),
+    [userProfile, divisions, grades, sections, classSections, staffAssignments, students]
+  );
+
   const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const classMap = useMemo(() => new Map(classSections.map((c) => [c.id, c])), [classSections]);
   const subMap = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
@@ -95,9 +110,11 @@ export const PerformanceModule: React.FC = () => {
 
   const matchingRequestStudents = useMemo(() => {
     const q = searchIqama.trim().toLowerCase();
-    return students.filter((s) => {
-      if (reqGradeId && s.grade_id !== reqGradeId) return false;
-      if (reqSectionId && s.section_id !== reqSectionId) return false;
+    const activeGrade = reqGradeId && scope.gradeIds.has(reqGradeId) ? reqGradeId : '';
+    const activeSection = reqSectionId && scope.sectionIds.has(reqSectionId) ? reqSectionId : '';
+    return scope.students.filter((s) => {
+      if (activeGrade && s.grade_id !== activeGrade) return false;
+      if (activeSection && s.section_id !== activeSection) return false;
       if (!q) return true;
       return (
         s.iqama_id.toLowerCase().includes(q) ||
@@ -105,7 +122,7 @@ export const PerformanceModule: React.FC = () => {
         s.name_ar.toLowerCase().includes(q)
       );
     });
-  }, [students, searchIqama, reqGradeId, reqSectionId]);
+  }, [scope, searchIqama, reqGradeId, reqSectionId]);
 
   const handleRequestReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,13 +141,13 @@ export const PerformanceModule: React.FC = () => {
           student_id: student.id,
           requested_by: userProfile.id,
           request_date: todayStr,
-          status: 'open',
+          status: 'pending',
         })
         .select()
         .single();
 
       if (reqErr || !reqData) {
-        setStatusMsg(reqErr?.message || 'Failed to create request');
+        setStatusMsg({ type: 'err', text: reqErr?.message || 'Failed to create request' });
         return;
       }
 
@@ -167,18 +184,27 @@ export const PerformanceModule: React.FC = () => {
           comment_text: null,
           is_submitted: false,
         }));
-        await supabase.from('performance_comments').insert(commentRows);
-        setStatusMsg(
-          lang === 'ar'
-            ? `تم إرسال الطلب وإشعار ${commentRows.length} معلم بنجاح.`
-            : `Performance report requested and ${commentRows.length} subject teachers notified.`
-        );
+        const { error: comErr } = await supabase.from('performance_comments').insert(commentRows);
+        if (comErr) {
+          setStatusMsg({ type: 'err', text: comErr.message });
+          await loadData();
+          return;
+        }
+        setStatusMsg({
+          type: 'ok',
+          text:
+            lang === 'ar'
+              ? `تم إرسال الطلب وإشعار ${commentRows.length} معلم بنجاح.`
+              : `Performance report requested and ${commentRows.length} subject teachers notified.`,
+        });
       } else {
-        setStatusMsg(
-          lang === 'ar'
-            ? 'تم إنشاء الطلب، ولكن لا يوجد معلمون معيّنون لهذا الفصل حالياً.'
-            : 'Request created, though no teachers are currently assigned to this class section.'
-        );
+        setStatusMsg({
+          type: 'ok',
+          text:
+            lang === 'ar'
+              ? 'تم إنشاء الطلب، ولكن لا يوجد معلمون معيّنون لهذا الفصل حالياً.'
+              : 'Request created, though no teachers are currently assigned to this class section.',
+        });
       }
 
       setReqStudentId('');
@@ -200,7 +226,7 @@ export const PerformanceModule: React.FC = () => {
     if (!text) return;
     setSavingCommentId(comment.id);
     try {
-      await supabase
+      const { error } = await supabase
         .from('performance_comments')
         .update({
           comment_text: text,
@@ -208,6 +234,22 @@ export const PerformanceModule: React.FC = () => {
           submitted_at: new Date().toISOString(),
         })
         .eq('id', comment.id);
+      if (error) {
+        setStatusMsg({ type: 'err', text: error.message });
+        return;
+      }
+
+      const siblingComments = comments.filter((c) => c.request_id === comment.request_id);
+      const allDone =
+        siblingComments.length > 0 &&
+        siblingComments.every((c) => (c.id === comment.id ? true : c.is_submitted));
+      if (allDone) {
+        await supabase
+          .from('performance_requests')
+          .update({ status: 'completed' })
+          .eq('id', comment.request_id);
+      }
+
       await loadData();
     } finally {
       setSavingCommentId(null);
@@ -225,21 +267,14 @@ export const PerformanceModule: React.FC = () => {
   );
 
   const scopedRequests = useMemo(() => {
-    if (activeRole === 'admin') return requests;
-    if (
-      (activeRole === 'principal' || activeRole === 'academic_supervisor') &&
-      userProfile?.division_id
-    ) {
-      const divGradeIds = new Set(
-        grades.filter((g) => g.division_id === userProfile.division_id).map((g) => g.id)
-      );
-      return requests.filter((r) => {
-        const st = studentMap.get(r.student_id);
-        return st ? divGradeIds.has(st.grade_id) : true;
-      });
-    }
-    return requests;
-  }, [requests, activeRole, userProfile, grades, studentMap]);
+    if (scope.isUnrestricted) return requests;
+    return requests.filter((r) => {
+      const st = studentMap.get(r.student_id);
+      return st
+        ? scope.classSectionIds.has(st.class_section_id) || scope.gradeIds.has(st.grade_id)
+        : false;
+    });
+  }, [requests, scope, studentMap]);
 
   const handleDownloadPdf = async (req: PerformanceRequest) => {
     const st = studentMap.get(req.student_id);
@@ -398,7 +433,7 @@ export const PerformanceModule: React.FC = () => {
             </div>
 
             <select
-              value={reqGradeId}
+              value={scope.gradeIds.has(reqGradeId) ? reqGradeId : ''}
               onChange={(e) => {
                 setReqGradeId(e.target.value);
                 setReqStudentId('');
@@ -406,7 +441,7 @@ export const PerformanceModule: React.FC = () => {
               className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
             >
               <option value="">{lang === 'ar' ? 'جميع الصفوف' : 'All Grades'}</option>
-              {grades.map((g) => (
+              {scope.grades.map((g) => (
                 <option key={g.id} value={g.id}>
                   {getLocalizedName(g, lang)}
                 </option>
@@ -414,7 +449,7 @@ export const PerformanceModule: React.FC = () => {
             </select>
 
             <select
-              value={reqSectionId}
+              value={scope.sectionIds.has(reqSectionId) ? reqSectionId : ''}
               onChange={(e) => {
                 setReqSectionId(e.target.value);
                 setReqStudentId('');
@@ -422,7 +457,7 @@ export const PerformanceModule: React.FC = () => {
               className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
             >
               <option value="">{lang === 'ar' ? 'جميع الشعب' : 'All Sections'}</option>
-              {sections.map((s) => (
+              {scope.sections.map((s) => (
                 <option key={s.id} value={s.id}>
                   {getLocalizedName(s, lang)}
                 </option>
@@ -445,7 +480,13 @@ export const PerformanceModule: React.FC = () => {
 
             <div className="sm:col-span-4 flex flex-wrap items-center justify-between gap-3">
               {statusMsg ? (
-                <p className="text-xs font-semibold text-emerald-700">{statusMsg}</p>
+                <p
+                  className={`text-xs font-semibold ${
+                    statusMsg.type === 'err' ? 'text-red-700' : 'text-emerald-700'
+                  }`}
+                >
+                  {statusMsg.text}
+                </p>
               ) : (
                 <span className="text-xs text-slate-500">
                   {lang === 'ar'
