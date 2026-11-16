@@ -1,0 +1,563 @@
+import React, { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Edit3, Megaphone, Plus, Trash2, X } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { supabase } from '../lib/supabase';
+import type { Notice, NoticePriority } from '../types/database';
+import { getLocalizedName, getLocalizedNotice } from '../utils/i18n';
+import { getRiyadhParts } from '../utils/riyadhTime';
+import { isDateInRange } from '../utils/schoolRules';
+
+export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
+  onOpenManager,
+}) => {
+  const { lang, notices, divisions, userProfile } = useApp();
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const todayRiyadh = useMemo(() => getRiyadhParts(new Date()).dateStr, []);
+
+  const activeNotices = useMemo(() => {
+    return notices.filter((n) => {
+      if (!isDateInRange(todayRiyadh, n.start_date, n.end_date)) return false;
+      if (
+        n.target_division_id &&
+        userProfile?.division_id &&
+        n.target_division_id !== userProfile.division_id &&
+        userProfile.active_role !== 'admin'
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [notices, todayRiyadh, userProfile]);
+
+  const canPublish =
+    userProfile?.active_role === 'principal' ||
+    userProfile?.active_role === 'academic_supervisor' ||
+    userProfile?.active_role === 'admin';
+
+  if (activeNotices.length === 0) {
+    if (!canPublish) return null;
+    return (
+      <div className="meis-glass rounded-2xl p-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 text-sm text-slate-600">
+          <Megaphone className="w-4 h-4 text-slate-400 shrink-0" />
+          <span>
+            {lang === 'ar'
+              ? 'لا توجد إعلانات نشطة لهذا اليوم.'
+              : 'No active notices scheduled for today.'}
+          </span>
+        </div>
+        {onOpenManager && (
+          <button
+            type="button"
+            onClick={onOpenManager}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 whitespace-nowrap cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{lang === 'ar' ? 'نشر إعلان' : 'Publish Notice'}</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const safeIdx = activeIndex % activeNotices.length;
+  const current = activeNotices[safeIdx];
+  const localized = getLocalizedNotice(current, lang);
+  const divName = current.target_division_id
+    ? getLocalizedName(
+        divisions.find((d) => d.id === current.target_division_id),
+        lang
+      )
+    : lang === 'ar'
+      ? 'جميع المراحل'
+      : 'All Divisions';
+
+  const priorityStyles: Record<NoticePriority, string> = {
+    urgent: 'bg-red-50/90 border-red-200 text-red-950',
+    important: 'bg-amber-50/90 border-amber-200 text-amber-950',
+    normal: 'bg-sky-50/90 border-sky-200 text-slate-900',
+  };
+
+  const priorityLabel: Record<NoticePriority, { ar: string; en: string }> = {
+    urgent: { ar: 'عاجل', en: 'Urgent' },
+    important: { ar: 'مهم', en: 'Important' },
+    normal: { ar: 'إعلان', en: 'Notice' },
+  };
+
+  return (
+    <section
+      aria-label={lang === 'ar' ? 'لوحة الإعلانات النشطة' : 'Active Notice Board'}
+      className={`rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-colors ${priorityStyles[current.priority]}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className="p-2.5 rounded-xl bg-white/80 border border-black/5 shrink-0">
+            <Megaphone className="w-5 h-5 text-slate-900" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold opacity-80 mb-1">
+              <span>{priorityLabel[current.priority][lang]}</span>
+              <span aria-hidden="true">·</span>
+              <span>{divName}</span>
+              <span aria-hidden="true">·</span>
+              <span className="tabular-nums font-mono">
+                {current.start_date === current.end_date
+                  ? current.start_date
+                  : `${current.start_date} → ${current.end_date}`}
+              </span>
+            </div>
+            <h2 className="text-base font-bold leading-snug">{localized.title}</h2>
+            <p className="text-sm opacity-90 mt-1 leading-relaxed">{localized.content}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {activeNotices.length > 1 && (
+            <div className="flex items-center gap-1 bg-white/70 rounded-xl p-1 border border-black/5">
+              <button
+                type="button"
+                aria-label="Previous notice"
+                onClick={() =>
+                  setActiveIndex((i) => (i - 1 + activeNotices.length) % activeNotices.length)
+                }
+                className="p-1 rounded-lg hover:bg-white cursor-pointer"
+              >
+                {lang === 'ar' ? (
+                  <ChevronRight className="w-4 h-4" />
+                ) : (
+                  <ChevronLeft className="w-4 h-4" />
+                )}
+              </button>
+              <span className="text-xs font-bold px-1.5 tabular-nums">
+                {safeIdx + 1} / {activeNotices.length}
+              </span>
+              <button
+                type="button"
+                aria-label="Next notice"
+                onClick={() => setActiveIndex((i) => (i + 1) % activeNotices.length)}
+                className="p-1 rounded-lg hover:bg-white cursor-pointer"
+              >
+                {lang === 'ar' ? (
+                  <ChevronLeft className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {canPublish && onOpenManager && (
+            <button
+              type="button"
+              onClick={onOpenManager}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 whitespace-nowrap cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{lang === 'ar' ? 'نشر إعلان' : 'Publish Notice'}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export const NoticeBoardManager: React.FC = () => {
+  const { lang, notices, divisions, profiles, userProfile, refreshMasterData } = useApp();
+  const todayRiyadh = getRiyadhParts(new Date()).dateStr;
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [titleAr, setTitleAr] = useState('');
+  const [titleEn, setTitleEn] = useState('');
+  const [contentAr, setContentAr] = useState('');
+  const [contentEn, setContentEn] = useState('');
+  const [priority, setPriority] = useState<NoticePriority>('normal');
+  const [targetDivisionId, setTargetDivisionId] = useState<string>('');
+  const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
+  const [startDate, setStartDate] = useState(todayRiyadh);
+  const [endDate, setEndDate] = useState(todayRiyadh);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const openCreate = () => {
+    setEditingNotice(null);
+    setTitleAr('');
+    setTitleEn('');
+    setContentAr('');
+    setContentEn('');
+    setPriority('normal');
+    setTargetDivisionId('');
+    setDateMode('single');
+    setStartDate(todayRiyadh);
+    setEndDate(todayRiyadh);
+    setErrorMsg(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (n: Notice) => {
+    setEditingNotice(n);
+    setTitleAr(n.title_ar);
+    setTitleEn(n.title_en);
+    setContentAr(n.content_ar);
+    setContentEn(n.content_en);
+    setPriority(n.priority);
+    setTargetDivisionId(n.target_division_id || '');
+    setDateMode(n.start_date === n.end_date ? 'single' : 'range');
+    setStartDate(n.start_date);
+    setEndDate(n.end_date);
+    setErrorMsg(null);
+    setModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    const effectiveTitleEn = titleEn.trim() || titleAr.trim();
+    const effectiveTitleAr = titleAr.trim() || titleEn.trim();
+    const effectiveContentEn = contentEn.trim() || contentAr.trim();
+    const effectiveContentAr = contentAr.trim() || contentEn.trim();
+
+    if (!effectiveTitleEn || !effectiveContentEn) {
+      setErrorMsg(
+        lang === 'ar' ? 'يرجى إدخال عنوان ونص الإعلان' : 'Please enter notice title and message'
+      );
+      return;
+    }
+
+    const effectiveEnd = dateMode === 'single' ? startDate : endDate;
+    if (effectiveEnd < startDate) {
+      setErrorMsg(
+        lang === 'ar'
+          ? 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية'
+          : 'End date must be on or after start date'
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        title_en: effectiveTitleEn,
+        title_ar: effectiveTitleAr,
+        content_en: effectiveContentEn,
+        content_ar: effectiveContentAr,
+        priority,
+        target_division_id: targetDivisionId || null,
+        start_date: startDate,
+        end_date: effectiveEnd,
+        published_by: userProfile?.id || null,
+      };
+
+      const { error } = editingNotice
+        ? await supabase.from('notices').update(payload).eq('id', editingNotice.id)
+        : await supabase.from('notices').insert(payload);
+
+      if (error) {
+        setErrorMsg(error.message);
+        return;
+      }
+
+      await refreshMasterData();
+      setModalOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    await supabase.from('notices').delete().eq('id', id);
+    await refreshMasterData();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {lang === 'ar' ? 'إدارة لوحة الإعلانات' : 'Notice Board Management'}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {lang === 'ar'
+              ? 'نشر وتعديل الإعلانات المدرسية حسب المرحلة ونطاق التاريخ.'
+              : 'Publish, edit, or schedule announcements across divisions and date ranges.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>{lang === 'ar' ? 'نشر إعلان جديد' : 'Publish Notice'}</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {notices.length === 0 ? (
+          <div className="meis-glass rounded-2xl p-10 text-center text-sm text-slate-500">
+            {lang === 'ar' ? 'لا توجد إعلانات منشورة حتى الآن.' : 'No notices published yet.'}
+          </div>
+        ) : (
+          notices.map((n) => {
+            const localized = getLocalizedNotice(n, lang);
+            const activeToday = isDateInRange(todayRiyadh, n.start_date, n.end_date);
+            const publisher = profiles.find((p) => p.id === n.published_by);
+            const div = divisions.find((d) => d.id === n.target_division_id);
+            return (
+              <div key={n.id} className="meis-glass rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1">
+                    <span className="font-bold text-slate-800 uppercase">{n.priority}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {div ? getLocalizedName(div, lang) : lang === 'ar' ? 'جميع المراحل' : 'All Divisions'}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="font-mono tabular-nums">
+                      {n.start_date} → {n.end_date}
+                    </span>
+                    {activeToday && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-emerald-700 font-bold">
+                          {lang === 'ar' ? 'نشط اليوم' : 'Active Today'}
+                        </span>
+                      </>
+                    )}
+                    {publisher && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>{getLocalizedName(publisher, lang)}</span>
+                      </>
+                    )}
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900">{localized.title}</h3>
+                  <p className="text-sm text-slate-600 mt-1">{localized.content}</p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    aria-label={`Edit ${localized.title}`}
+                    onClick={() => openEdit(n)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>{lang === 'ar' ? 'تعديل' : 'Edit'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${localized.title}`}
+                    onClick={() => void handleDelete(n.id)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-700 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{lang === 'ar' ? 'حذف' : 'Delete'}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-900">
+                {editingNotice
+                  ? lang === 'ar'
+                    ? 'تعديل الإعلان'
+                    : 'Edit Notice'
+                  : lang === 'ar'
+                    ? 'نشر إعلان جديد'
+                    : 'Publish New Notice'}
+              </h2>
+              <button
+                type="button"
+                aria-label="Close modal"
+                onClick={() => setModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {lang === 'ar' ? 'العنوان (عربي)' : 'Title (Arabic)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={titleAr}
+                    onChange={(e) => setTitleAr(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {lang === 'ar' ? 'العنوان (إنجليزي)' : 'Title (English)'}
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={titleEn}
+                    onChange={(e) => setTitleEn(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {lang === 'ar' ? 'نص الإعلان (عربي)' : 'Message (Arabic)'}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={contentAr}
+                    onChange={(e) => setContentAr(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {lang === 'ar' ? 'نص الإعلان (إنجليزي)' : 'Message (English)'}
+                  </label>
+                  <textarea
+                    rows={3}
+                    dir="ltr"
+                    value={contentEn}
+                    onChange={(e) => setContentEn(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {lang === 'ar' ? 'الأهمية' : 'Priority'}
+                  </label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as NoticePriority)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                  >
+                    <option value="normal">{lang === 'ar' ? 'عادي' : 'Normal'}</option>
+                    <option value="important">{lang === 'ar' ? 'مهم' : 'Important'}</option>
+                    <option value="urgent">{lang === 'ar' ? 'عاجل' : 'Urgent'}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {lang === 'ar' ? 'المرحلة المستهدفة' : 'Target Division'}
+                  </label>
+                  <select
+                    value={targetDivisionId}
+                    onChange={(e) => setTargetDivisionId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                  >
+                    <option value="">{lang === 'ar' ? 'جميع المراحل' : 'All Divisions'}</option>
+                    {divisions.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {getLocalizedName(d, lang)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {lang === 'ar' ? 'نمط التاريخ' : 'Schedule Type'}
+                  </label>
+                  <select
+                    value={dateMode}
+                    onChange={(e) => setDateMode(e.target.value as 'single' | 'range')}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                  >
+                    <option value="single">{lang === 'ar' ? 'يوم واحد' : 'Single Date'}</option>
+                    <option value="range">{lang === 'ar' ? 'نطاق تاريخ' : 'Date Range'}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    {dateMode === 'single'
+                      ? lang === 'ar'
+                        ? 'التاريخ'
+                        : 'Date'
+                      : lang === 'ar'
+                        ? 'من تاريخ'
+                        : 'Start Date'}
+                  </label>
+                  <input
+                    type="date"
+                    dir="ltr"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  />
+                </div>
+                {dateMode === 'range' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      {lang === 'ar' ? 'إلى تاريخ' : 'End Date'}
+                    </label>
+                    <input
+                      type="date"
+                      dir="ltr"
+                      required
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-medium text-red-700">
+                  {errorMsg}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold cursor-pointer disabled:opacity-60"
+                >
+                  {saving
+                    ? lang === 'ar'
+                      ? 'جارٍ الحفظ...'
+                      : 'Saving...'
+                    : lang === 'ar'
+                      ? 'حفظ الإعلان'
+                      : 'Save Notice'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
