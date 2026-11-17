@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  FileDown,
+  Search,
   Trash2,
   UserPlus,
 } from 'lucide-react';
@@ -17,6 +19,7 @@ import {
   getLocalizedName,
   tr,
 } from '../utils/i18n';
+import { exportDailyAbsencesPdf } from '../utils/pdfExport';
 import {
   addDaysToDateStr,
   getIsoWeekdayFromDateStr,
@@ -28,6 +31,7 @@ import {
   filterTeachersInScope,
   getAvailableSubstitutes,
   getRoleScope,
+  matchesBilingualSearch,
 } from '../utils/schoolRules';
 
 const DAYS = [0, 1, 2, 3, 4]; // Sun - Thu
@@ -56,6 +60,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(userProfile?.id || '');
+  const [ttTeacherSearch, setTtTeacherSearch] = useState('');
   const [editingCell, setEditingCell] = useState<{ day: number; period: number } | null>(null);
   const [cellClassId, setCellClassId] = useState('');
   const [cellSubjectId, setCellSubjectId] = useState('');
@@ -63,16 +68,20 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
   // Absence & Substitution state
   const [absenceDate, setAbsenceDate] = useState(riyadhToday);
+  const [activeDayDate, setActiveDayDate] = useState(riyadhToday);
   const [weekAnchorDate, setWeekAnchorDate] = useState(riyadhToday);
-  const [absenceViewMode, setAbsenceViewMode] = useState<'week' | 'upcoming'>('week');
+  const [absenceViewMode, setAbsenceViewMode] = useState<'day' | 'week'>('day');
   const [absenceTeacherId, setAbsenceTeacherId] = useState(userProfile?.id || '');
+  const [absenceTeacherSearch, setAbsenceTeacherSearch] = useState('');
   const [absenceReason, setAbsenceReason] = useState('');
   const [absenceError, setAbsenceError] = useState<string | null>(null);
+  const [exportingDayPdf, setExportingDayPdf] = useState(false);
 
   const [assignModal, setAssignModal] = useState<{
     absence: TeacherAbsence;
     slot: TimetableSlot;
   } | null>(null);
+  const [subSearchQuery, setSubSearchQuery] = useState('');
 
   const activeRole = userProfile?.active_role || 'teacher';
   const canManageAll = activeRole !== 'teacher';
@@ -97,6 +106,20 @@ export const TimetableSubstitutionModule: React.FC = () => {
     () => filterTeachersInScope({ profiles, scope, staffAssignments, timetableSlots: slots }),
     [profiles, scope, staffAssignments, slots]
   );
+
+  const filteredTtTeachers = useMemo(() => {
+    if (!ttTeacherSearch.trim()) return teachersList;
+    return teachersList.filter((t) =>
+      matchesBilingualSearch(ttTeacherSearch, t.name_en, t.name_ar, t.email)
+    );
+  }, [teachersList, ttTeacherSearch]);
+
+  const filteredAbsenceTeachers = useMemo(() => {
+    if (!absenceTeacherSearch.trim()) return teachersList;
+    return teachersList.filter((t) =>
+      matchesBilingualSearch(absenceTeacherSearch, t.name_en, t.name_ar, t.email)
+    );
+  }, [teachersList, absenceTeacherSearch]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -310,6 +333,13 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
   const weekBounds = useMemo(() => getSchoolWeekBounds(weekAnchorDate), [weekAnchorDate]);
 
+  const activeDayWeekday = getIsoWeekdayFromDateStr(activeDayDate);
+  const activeDayWeekdayLabel = DAY_NAMES[activeDayWeekday]
+    ? DAY_NAMES[activeDayWeekday][lang]
+    : lang === 'ar'
+      ? 'عطلة نهاية الأسبوع'
+      : 'Weekend';
+
   const roleScopedAbsences = useMemo(() => {
     if (!canManageAll) {
       return absences.filter((a) => a.teacher_id === userProfile?.id);
@@ -319,22 +349,36 @@ export const TimetableSubstitutionModule: React.FC = () => {
     return absences.filter((a) => allowedIds.has(a.teacher_id));
   }, [absences, canManageAll, userProfile, scope.isUnrestricted, teachersList]);
 
-  const upcomingAbsencesCount = useMemo(
-    () => roleScopedAbsences.filter((a) => a.absence_date >= riyadhToday).length,
-    [roleScopedAbsences, riyadhToday]
-  );
-
   const displayedAbsences = useMemo(() => {
     const filtered =
-      absenceViewMode === 'upcoming'
-        ? roleScopedAbsences.filter((a) => a.absence_date >= riyadhToday)
+      absenceViewMode === 'day'
+        ? roleScopedAbsences.filter((a) => a.absence_date === activeDayDate)
         : roleScopedAbsences.filter(
             (a) =>
               a.absence_date >= weekBounds.weekStart &&
               a.absence_date <= weekBounds.weekEndSat
           );
     return filtered.slice().sort((a, b) => a.absence_date.localeCompare(b.absence_date));
-  }, [roleScopedAbsences, absenceViewMode, riyadhToday, weekBounds]);
+  }, [roleScopedAbsences, absenceViewMode, activeDayDate, weekBounds]);
+
+  const handleExportDayPdf = async () => {
+    const dayAbsences = roleScopedAbsences.filter((a) => a.absence_date === activeDayDate);
+    setExportingDayPdf(true);
+    try {
+      await exportDailyAbsencesPdf({
+        targetDate: activeDayDate,
+        absences: dayAbsences,
+        substitutions,
+        timetableSlots: slots,
+        classSections,
+        subjects,
+        profiles,
+        settings: schoolSettings,
+      });
+    } finally {
+      setExportingDayPdf(false);
+    }
+  };
 
   const mySubstitutionsToday = useMemo(() => {
     if (!userProfile) return [];
@@ -394,6 +438,23 @@ export const TimetableSubstitutionModule: React.FC = () => {
       maxMonthlySubstitutions: maxSubs,
     });
   }, [assignModal, profiles, slots, absences, substitutions, maxSubs]);
+
+  const filteredCandidatesForModal = useMemo(() => {
+    if (!subSearchQuery.trim()) return candidatesForModal;
+    return candidatesForModal.filter((cand) => {
+      const sub = cand.teacher.primary_subject_id
+        ? subMap.get(cand.teacher.primary_subject_id)
+        : undefined;
+      return matchesBilingualSearch(
+        subSearchQuery,
+        cand.teacher.name_en,
+        cand.teacher.name_ar,
+        cand.teacher.email,
+        sub?.name_en,
+        sub?.name_ar
+      );
+    });
+  }, [candidatesForModal, subSearchQuery, subMap]);
 
   return (
     <div className="space-y-6">
@@ -458,7 +519,24 @@ export const TimetableSubstitutionModule: React.FC = () => {
           </div>
 
           {canManageAll && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                <input
+                  type="text"
+                  value={ttTeacherSearch}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTtTeacherSearch(val);
+                    const firstMatch = teachersList.find((t) =>
+                      matchesBilingualSearch(val, t.name_en, t.name_ar, t.email)
+                    );
+                    if (firstMatch) setSelectedTeacherId(firstMatch.id);
+                  }}
+                  placeholder={lang === 'ar' ? 'بحث بالمعلم...' : 'Search teacher (EN/AR)...'}
+                  className="ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs w-48"
+                />
+              </div>
               <label htmlFor="tt-teacher-select" className="text-xs font-semibold text-slate-600">
                 {lang === 'ar' ? 'معلم الجدول:' : 'Teacher:'}
               </label>
@@ -468,7 +546,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                 onChange={(e) => setSelectedTeacherId(e.target.value)}
                 className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold"
               >
-                {teachersList.map((t) => (
+                {filteredTtTeachers.map((t) => (
                   <option key={t.id} value={t.id}>
                     {getLocalizedName(t, lang)}
                   </option>
@@ -557,7 +635,10 @@ export const TimetableSubstitutionModule: React.FC = () => {
                 onChange={(e) => {
                   const next = e.target.value;
                   setAbsenceDate(next);
-                  if (next) setWeekAnchorDate(next);
+                  if (next) {
+                    setActiveDayDate(next);
+                    setWeekAnchorDate(next);
+                  }
                 }}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
               />
@@ -566,20 +647,41 @@ export const TimetableSubstitutionModule: React.FC = () => {
             {canManageAll && (
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  {lang === 'ar' ? 'المعلم' : 'Teacher'}
+                  {lang === 'ar' ? 'المعلم (بحث عربي/إنجليزي)' : 'Teacher (Search EN/AR)'}
                 </label>
-                <select
-                  required
-                  value={absenceTeacherId}
-                  onChange={(e) => setAbsenceTeacherId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
-                >
-                  {teachersList.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {getLocalizedName(t, lang)}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                    <input
+                      type="text"
+                      value={absenceTeacherSearch}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setAbsenceTeacherSearch(val);
+                        const firstMatch = teachersList.find((t) =>
+                          matchesBilingualSearch(val, t.name_en, t.name_ar, t.email)
+                        );
+                        if (firstMatch) setAbsenceTeacherId(firstMatch.id);
+                      }}
+                      placeholder={
+                        lang === 'ar' ? 'ابحث باسم المعلم...' : 'Search teacher EN / AR...'
+                      }
+                      className="w-full ps-8 pe-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs"
+                    />
+                  </div>
+                  <select
+                    required
+                    value={absenceTeacherId}
+                    onChange={(e) => setAbsenceTeacherId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                  >
+                    {filteredAbsenceTeachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {getLocalizedName(t, lang)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
 
@@ -612,7 +714,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
           </form>
         </section>
 
-        {/* Absences & Smart Substitution List (Whole Week & Upcoming) */}
+        {/* Absences & Smart Substitution List (Current Day / Current Week) */}
         <section className="lg:col-span-8 meis-glass rounded-2xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
             <div>
@@ -622,18 +724,33 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   : 'Absent Teachers & Smart Substitutions'}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
-                {absenceViewMode === 'week'
-                  ? lang === 'ar'
-                    ? `الأسبوع الدراسي: ${weekBounds.weekStart} إلى ${weekBounds.weekEndThu}`
-                    : `School Week: ${weekBounds.weekStart} (Sun) — ${weekBounds.weekEndThu} (Thu)`
+                {absenceViewMode === 'day'
+                  ? `${activeDayDate} · ${activeDayWeekdayLabel}${
+                      activeDayDate === riyadhToday
+                        ? lang === 'ar'
+                          ? ' (اليوم الحالي)'
+                          : ' (Today)'
+                        : ''
+                    }`
                   : lang === 'ar'
-                    ? `جميع الغيابات القادمة ابتداءً من ${riyadhToday}`
-                    : `All Upcoming Absences (from ${riyadhToday})`}
+                    ? `الأسبوع الدراسي: ${weekBounds.weekStart} إلى ${weekBounds.weekEndThu}`
+                    : `School Week: ${weekBounds.weekStart} (Sun) — ${weekBounds.weekEndThu} (Thu)`}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setAbsenceViewMode('day')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                    absenceViewMode === 'day'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {lang === 'ar' ? 'اليوم الحالي' : 'Current Day'}
+                </button>
                 <button
                   type="button"
                   onClick={() => setAbsenceViewMode('week')}
@@ -643,24 +760,45 @@ export const TimetableSubstitutionModule: React.FC = () => {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {lang === 'ar' ? 'الأسبوع كامل' : 'Full Week'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAbsenceViewMode('upcoming')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap tabular-nums ${
-                    absenceViewMode === 'upcoming'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {lang === 'ar'
-                    ? `القادمة (${upcomingAbsencesCount})`
-                    : `All Upcoming (${upcomingAbsencesCount})`}
+                  {lang === 'ar' ? 'الأسبوع الحالي' : 'Current Week'}
                 </button>
               </div>
 
-              {absenceViewMode === 'week' && (
+              {absenceViewMode === 'day' ? (
+                <div className="inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Previous day"
+                    onClick={() => setActiveDayDate((d) => addDaysToDateStr(d, -1))}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                  >
+                    {lang === 'ar' ? (
+                      <ChevronRight className="w-4 h-4" />
+                    ) : (
+                      <ChevronLeft className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveDayDate(riyadhToday)}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                  >
+                    {lang === 'ar' ? 'اليوم' : 'Today'}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next day"
+                    onClick={() => setActiveDayDate((d) => addDaysToDateStr(d, 1))}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                  >
+                    {lang === 'ar' ? (
+                      <ChevronLeft className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              ) : (
                 <div className="inline-flex items-center gap-1">
                   <button
                     type="button"
@@ -695,6 +833,18 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   </button>
                 </div>
               )}
+
+              {canManageAll && absenceViewMode === 'day' && (
+                <button
+                  type="button"
+                  disabled={exportingDayPdf}
+                  onClick={() => void handleExportDayPdf()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap disabled:opacity-60"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>{lang === 'ar' ? 'تصدير PDF لليوم' : 'Export Day PDF'}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -704,25 +854,14 @@ export const TimetableSubstitutionModule: React.FC = () => {
             ) : displayedAbsences.length === 0 ? (
               <div className="py-10 text-center space-y-2">
                 <p className="text-xs text-slate-500">
-                  {absenceViewMode === 'week'
+                  {absenceViewMode === 'day'
                     ? lang === 'ar'
-                      ? 'لا توجد غيابات مسجلة للمعلمين خلال هذا الأسبوع.'
-                      : 'No teacher absences recorded for this week.'
+                      ? 'لا توجد غيابات مسجلة للمعلمين في هذا اليوم.'
+                      : 'No teacher absences recorded for this date.'
                     : lang === 'ar'
-                      ? 'لا توجد غيابات قادمة مسجلة حالياً.'
-                      : 'No upcoming teacher absences recorded.'}
+                      ? 'لا توجد غيابات مسجلة للمعلمين خلال هذا الأسبوع.'
+                      : 'No teacher absences recorded for this week.'}
                 </p>
-                {absenceViewMode === 'week' && upcomingAbsencesCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setAbsenceViewMode('upcoming')}
-                    className="text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
-                  >
-                    {lang === 'ar'
-                      ? `عرض ${upcomingAbsencesCount} غياب مسجل في التواريخ القادمة`
-                      : `View ${upcomingAbsencesCount} upcoming absence(s) in future weeks`}
-                  </button>
-                )}
               </div>
             ) : (
               displayedAbsences.map((abs) => {
@@ -836,7 +975,10 @@ export const TimetableSubstitutionModule: React.FC = () => {
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button
                                     type="button"
-                                    onClick={() => setAssignModal({ absence: abs, slot })}
+                                    onClick={() => {
+                                      setSubSearchQuery('');
+                                      setAssignModal({ absence: abs, slot });
+                                    }}
                                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
                                   >
                                     <UserPlus className="w-3.5 h-3.5" />
@@ -994,57 +1136,98 @@ export const TimetableSubstitutionModule: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-4 space-y-2.5">
-              {candidatesForModal.length === 0 ? (
-                <p className="text-xs text-slate-500 py-6 text-center">
-                  {lang === 'ar'
-                    ? 'لا يوجد معلمون متاحون في هذه الحصة.'
-                    : 'No free teachers available during this period.'}
-                </p>
-              ) : (
-                candidatesForModal.map((cand) => (
-                  <div
-                    key={cand.teacher.id}
-                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
-                      cand.reachedLimit
-                        ? 'bg-red-50/70 border-red-200'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 truncate">
-                        {getLocalizedName(cand.teacher, lang)}
-                      </p>
-                      <p className="text-xs text-slate-600 mt-0.5 tabular-nums">
-                        {lang === 'ar'
-                          ? `رصيد الانتظار هذا الشهر: ${cand.monthlyCount} / ${maxSubs}`
-                          : `${cand.monthlyCount} / ${maxSubs} substitutions this month`}
-                        {cand.reachedLimit && (
-                          <span className="text-red-700 font-bold">
-                            {' '}
-                            · {lang === 'ar' ? 'بلغ الحد الشهري' : 'Monthly limit reached'}
-                          </span>
-                        )}
-                      </p>
-                    </div>
+            <div className="mt-4 space-y-3">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3.5" />
+                <input
+                  type="text"
+                  value={subSearchQuery}
+                  onChange={(e) => setSubSearchQuery(e.target.value)}
+                  placeholder={
+                    lang === 'ar'
+                      ? 'ابحث عن المعلم بالاسم العربي أو الإنجليزي أو المادة...'
+                      : 'Search teacher by English or Arabic name or subject...'
+                  }
+                  className="w-full ps-10 pe-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                />
+              </div>
 
-                    <button
-                      type="button"
-                      disabled={cand.alreadyAssignedThisPeriod}
-                      onClick={() => void handleAssignSubstitute(cand.teacher.id)}
-                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-40 shrink-0"
-                    >
-                      {cand.alreadyAssignedThisPeriod
-                        ? lang === 'ar'
-                          ? 'مكلف بالفعل'
-                          : 'Assigned'
-                        : lang === 'ar'
-                          ? 'تعيين'
-                          : 'Assign'}
-                    </button>
-                  </div>
-                ))
-              )}
+              <div className="space-y-2.5 max-h-[55vh] overflow-y-auto pe-0.5">
+                {filteredCandidatesForModal.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-6 text-center">
+                    {candidatesForModal.length === 0
+                      ? lang === 'ar'
+                        ? 'لا يوجد معلمون متاحون في هذه الحصة.'
+                        : 'No free teachers available during this period.'
+                      : lang === 'ar'
+                        ? 'لا يوجد معلمون مطابقون للبحث.'
+                        : 'No matching teachers found.'}
+                  </p>
+                ) : (
+                  filteredCandidatesForModal.map((cand) => {
+                    const primaryName = getLocalizedName(cand.teacher, lang);
+                    const secondaryName =
+                      lang === 'ar' ? cand.teacher.name_en : cand.teacher.name_ar;
+                    const showSecondary =
+                      secondaryName && secondaryName.trim() !== primaryName.trim();
+                    const sub = cand.teacher.primary_subject_id
+                      ? subMap.get(cand.teacher.primary_subject_id)
+                      : undefined;
+                    return (
+                      <div
+                        key={cand.teacher.id}
+                        className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                          cand.reachedLimit
+                            ? 'bg-red-50/70 border-red-200'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate">
+                            {primaryName}
+                            {showSecondary && (
+                              <span className="text-xs font-normal text-slate-500 ms-1.5">
+                                ({secondaryName})
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-slate-600 mt-0.5 tabular-nums">
+                            {sub && (
+                              <span className="font-semibold text-emerald-700 me-1.5">
+                                {getLocalizedName(sub, lang)} ·
+                              </span>
+                            )}
+                            {lang === 'ar'
+                              ? `رصيد الانتظار هذا الشهر: ${cand.monthlyCount} / ${maxSubs}`
+                              : `${cand.monthlyCount} / ${maxSubs} substitutions this month`}
+                            {cand.reachedLimit && (
+                              <span className="text-red-700 font-bold">
+                                {' '}
+                                · {lang === 'ar' ? 'بلغ الحد الشهري' : 'Monthly limit reached'}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={cand.alreadyAssignedThisPeriod}
+                          onClick={() => void handleAssignSubstitute(cand.teacher.id)}
+                          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-40 shrink-0"
+                        >
+                          {cand.alreadyAssignedThisPeriod
+                            ? lang === 'ar'
+                              ? 'مكلف بالفعل'
+                              : 'Assigned'
+                            : lang === 'ar'
+                              ? 'تعيين'
+                              : 'Assign'}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
         </div>

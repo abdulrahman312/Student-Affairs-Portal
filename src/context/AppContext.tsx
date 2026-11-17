@@ -214,8 +214,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (data as Profile) || { ...profile, roles: updatedRoles, is_onboarded: true };
   }, []);
 
-  const resolveProfileSession = useCallback(async () => {
-    setAuthLoading(true);
+  const resolveProfileSession = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
+    if (!silent) setAuthLoading(true);
     try {
       const impersonateId = localStorage.getItem(IMPERSONATE_PROFILE_KEY);
       const dummyId = localStorage.getItem(DUMMY_PROFILE_KEY);
@@ -304,9 +305,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setRealAdminProfile(null);
       setUserProfile(baseProfile);
     } finally {
-      setAuthLoading(false);
+      if (!silent) setAuthLoading(false);
     }
   }, [ensureSuperAdminRoles]);
+
+  const refreshCurrentProfile = useCallback(async () => {
+    await resolveProfileSession({ silent: true });
+  }, [resolveProfileSession]);
 
   useEffect(() => {
     void refreshMasterData();
@@ -529,7 +534,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         staffAssignments,
         notices,
         refreshMasterData,
-        refreshCurrentProfile: resolveProfileSession,
+        refreshCurrentProfile,
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,

@@ -607,3 +607,43 @@ export function validateRoleConfiguration(params: {
   return null;
 }
 
+/**
+ * Normalizes English and Arabic text for forgiving bilingual search:
+ * - Strips Arabic diacritics (tashkeel) and tatweel
+ * - Normalizes Arabic Alef variants (أ/إ/آ/ٱ -> ا), Teh Marbuta (ة -> ه), Alef Maksura (ى -> ي)
+ * - Lowercases Latin text and collapses whitespace
+ */
+export function normalizeSearchText(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Matches a user search query against any combination of bilingual fields (English name,
+ * Arabic name, email, Iqama ID, etc.). Every space-separated token must match at least one field.
+ */
+export function matchesBilingualSearch(
+  query: string,
+  ...fields: (string | null | undefined)[]
+): boolean {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+
+  const tokens = normalizedQuery.split(' ').filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  const normalizedFields = fields.map((f) => normalizeSearchText(f)).filter(Boolean);
+  if (normalizedFields.length === 0) return false;
+
+  return tokens.every((token) => normalizedFields.some((field) => field.includes(token)));
+}
+

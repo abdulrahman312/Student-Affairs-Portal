@@ -10,8 +10,12 @@ import type {
   SchoolSettings,
   Student,
   Subject,
+  Substitution,
+  TeacherAbsence,
+  TimetableSlot,
 } from '../types/database';
-import { getRiyadhParts } from './riyadhTime';
+import { DAY_NAMES } from './i18n';
+import { getIsoWeekdayFromDateStr, getRiyadhParts } from './riyadhTime';
 
 const MEIS_CREST_PATH = '/src/assets/images/meis_school_crest_1794849576691.jpg';
 
@@ -420,3 +424,209 @@ export async function exportPerformanceReportPdf(params: {
   const safeName = (student.name_en || student.iqama_id).replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`MEIS_Performance_Report_${safeName}_${request.request_date}.pdf`);
 }
+
+export async function exportDailyAbsencesPdf(params: {
+  targetDate: string;
+  absences: TeacherAbsence[];
+  substitutions: Substitution[];
+  timetableSlots: TimetableSlot[];
+  classSections: ClassSection[];
+  subjects: Subject[];
+  profiles: Profile[];
+  settings: SchoolSettings | null;
+}): Promise<void> {
+  const {
+    targetDate,
+    absences,
+    substitutions,
+    timetableSlots,
+    classSections,
+    subjects,
+    profiles,
+    settings,
+  } = params;
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const classMap = new Map(classSections.map((c) => [c.id, c]));
+  const subMap = new Map(subjects.map((s) => [s.id, s]));
+  const profMap = new Map(profiles.map((p) => [p.id, p]));
+
+  const weekday = getIsoWeekdayFromDateStr(targetDate);
+  const weekdayEn = DAY_NAMES[weekday]?.en || 'Weekend';
+
+  let y = await drawMeisHeader(
+    doc,
+    'Daily Teacher Absences & Substitutions Report',
+    `Date: ${targetDate} (${weekdayEn})`,
+    settings
+  );
+
+  // Build rows & summary totals
+  const sortedAbsences = [...absences].sort((a, b) => {
+    const nameA = profMap.get(a.teacher_id)?.name_en || '';
+    const nameB = profMap.get(b.teacher_id)?.name_en || '';
+    return nameA.localeCompare(nameB);
+  });
+
+  let totalScheduledPeriods = 0;
+  let coveredPeriods = 0;
+  let uncoveredPeriods = 0;
+
+  const tableRows: { cells: string[]; needsSubstitute: boolean }[] = [];
+
+  sortedAbsences.forEach((abs, idx) => {
+    const teacherName = profMap.get(abs.teacher_id)?.name_en || 'Teacher';
+    const reasonText = abs.reason || '-';
+    const teacherDaySlots = timetableSlots
+      .filter((s) => s.teacher_id === abs.teacher_id && s.day_of_week === weekday)
+      .sort((a, b) => a.period_number - b.period_number);
+
+    if (teacherDaySlots.length === 0) {
+      tableRows.push({
+        cells: [
+          String(idx + 1),
+          teacherName,
+          reasonText,
+          '-',
+          'No scheduled periods on this weekday',
+          'N/A',
+        ],
+        needsSubstitute: false,
+      });
+      return;
+    }
+
+    teacherDaySlots.forEach((slot, sIdx) => {
+      totalScheduledPeriods += 1;
+      const cs = classMap.get(slot.class_section_id);
+      const sub = subMap.get(slot.subject_id);
+      const assignedSub = substitutions.find(
+        (s) =>
+          s.absence_date === targetDate &&
+          s.period_number === slot.period_number &&
+          s.class_section_id === slot.class_section_id
+      );
+      const subTeacher = assignedSub
+        ? profMap.get(assignedSub.substitute_teacher_id)?.name_en || 'Assigned Teacher'
+        : null;
+
+      if (subTeacher) {
+        coveredPeriods += 1;
+      } else {
+        uncoveredPeriods += 1;
+      }
+
+      const classLabel = `${cs?.display_name_en || '-'}${sub?.name_en ? ` (${sub.name_en})` : ''}`;
+      tableRows.push({
+        cells: [
+          sIdx === 0 ? String(idx + 1) : '',
+          sIdx === 0 ? teacherName : '',
+          sIdx === 0 ? reasonText : '',
+          `Period ${slot.period_number}`,
+          classLabel,
+          subTeacher || 'Needs Substitute',
+        ],
+        needsSubstitute: !subTeacher,
+      });
+    });
+  });
+
+  // Summary cards
+  const cardWidth = (pageWidth - 36) / 3;
+  const badges = [
+    {
+      label: 'ABSENT TEACHERS',
+      value: String(sortedAbsences.length),
+      bg: [239, 246, 255],
+      border: [191, 219, 254],
+      fg: [29, 78, 216],
+    },
+    {
+      label: 'COVERED PERIODS',
+      value: `${coveredPeriods} / ${totalScheduledPeriods}`,
+      bg: [236, 253, 245],
+      border: [167, 243, 208],
+      fg: [4, 120, 87],
+    },
+    {
+      label: 'NEEDS SUBSTITUTE',
+      value: String(uncoveredPeriods),
+      bg: uncoveredPeriods > 0 ? [254, 242, 242] : [248, 250, 252],
+      border: uncoveredPeriods > 0 ? [254, 202, 202] : [203, 213, 225],
+      fg: uncoveredPeriods > 0 ? [185, 28, 28] : [71, 85, 105],
+    },
+  ];
+
+  badges.forEach((b, idx) => {
+    const bx = 14 + idx * (cardWidth + 4);
+    doc.setFillColor(b.bg[0], b.bg[1], b.bg[2]);
+    doc.setDrawColor(b.border[0], b.border[1], b.border[2]);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(bx, y, cardWidth, 16, 2.5, 2.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(b.fg[0], b.fg[1], b.fg[2]);
+    doc.text(b.label, bx + 4, y + 5.5);
+    doc.setFontSize(11);
+    doc.text(b.value, bx + 4, y + 12.5);
+  });
+
+  y += 22;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Absent Teacher', 'Reason', 'Period', 'Class & Subject', 'Substitute Teacher']],
+    body: tableRows.length
+      ? tableRows.map((r) => r.cells)
+      : [['-', 'No teacher absences recorded for this date', '-', '-', '-', '-']],
+    theme: 'grid',
+    headStyles: {
+      fillColor: COLORS.tableHeadBg,
+      textColor: COLORS.royalNavy,
+      lineColor: COLORS.tableHeadBorder,
+      lineWidth: 0.35,
+      fontStyle: 'bold',
+      fontSize: 8.5,
+      cellPadding: 3,
+    },
+    styles: {
+      lineColor: COLORS.cardBorder,
+      lineWidth: 0.25,
+    },
+    bodyStyles: {
+      fontSize: 8.5,
+      textColor: COLORS.bodyText,
+      cellPadding: 3,
+      valign: 'middle',
+    },
+    alternateRowStyles: {
+      fillColor: COLORS.zebraBg,
+    },
+    columnStyles: {
+      0: { cellWidth: 9, halign: 'center' },
+      1: { cellWidth: 38, fontStyle: 'bold' },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 20, halign: 'center' },
+      4: { cellWidth: 44 },
+      5: { cellWidth: 'auto', fontStyle: 'bold' },
+    },
+    didParseCell: (hookData) => {
+      if (hookData.section === 'body' && hookData.column.index === 5) {
+        const rowMeta = tableRows[hookData.row.index];
+        if (rowMeta?.needsSubstitute) {
+          hookData.cell.styles.textColor = [180, 83, 9]; // amber-700
+        } else if (hookData.cell.text[0] && hookData.cell.text[0] !== 'N/A' && hookData.cell.text[0] !== '-') {
+          hookData.cell.styles.textColor = COLORS.emeraldDark;
+        }
+      }
+    },
+    margin: { left: 14, right: 14, bottom: 18 },
+  });
+
+  drawFooter(doc, settings);
+
+  doc.save(`MEIS_Daily_Absences_Substitutions_${targetDate}.pdf`);
+}
+

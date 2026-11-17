@@ -12,12 +12,14 @@ import {
   Settings,
   ShieldAlert,
   UserCheck,
+  UserCog,
   X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { UserRole } from '../types/database';
 import { getLocalizedName, ROLE_LABELS, tr } from '../utils/i18n';
 import { formatRiyadhClock, getActiveTimeslotLabel } from '../utils/riyadhTime';
+import { ProfileSettingsModal } from './ProfileSettingsModal';
 
 export type NavTab =
   | 'dashboard'
@@ -57,6 +59,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({
 
   const [now, setNow] = useState<Date>(() => new Date());
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
 
   useEffect(() => {
@@ -199,7 +202,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-200/80 space-y-3">
+        <div className="p-4 border-t border-slate-200/80 space-y-2.5">
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900 truncate">
               {getLocalizedName(userProfile, lang)}
@@ -208,6 +211,14 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({
               {ROLE_LABELS[activeRole]?.[lang]} · {userProfile.email}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition-colors cursor-pointer"
+          >
+            <UserCog className="w-3.5 h-3.5 text-emerald-700" />
+            <span>{tr('profileSettings', lang)}</span>
+          </button>
           <button
             type="button"
             onClick={signOut}
@@ -261,7 +272,18 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({
                 );
               })}
             </nav>
-            <div className="p-4 border-t border-slate-200">
+            <div className="p-4 border-t border-slate-200 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  setSettingsOpen(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+              >
+                <UserCog className="w-4 h-4 text-emerald-700" />
+                <span>{tr('profileSettings', lang)}</span>
+              </button>
               <button
                 type="button"
                 onClick={signOut}
@@ -396,6 +418,8 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({
           );
         })}
       </nav>
+
+      {settingsOpen && <ProfileSettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 };

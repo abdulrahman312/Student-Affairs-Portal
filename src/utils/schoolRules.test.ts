@@ -10,6 +10,8 @@ import {
   getRoleScope,
   isAllowedSchoolEmail,
   isDateInRange,
+  matchesBilingualSearch,
+  normalizeSearchText,
   parseStudentExcelRows,
   validateRoleConfiguration,
 } from './schoolRules';
@@ -514,4 +516,26 @@ test('getSchoolWeekBounds returns Sunday through Thursday/Saturday for any date'
   assert.equal(addDaysToDateStr('2026-11-15', 7), '2026-11-22');
 });
 
-
+test('matchesBilingualSearch searches both Arabic and English names with Arabic normalization', () => {
+  assert.equal(normalizeSearchText('أَحْمَد إِبْرَاهِيم'), 'احمد ابراهيم');
+  // Matches Arabic regardless of Hamza/diacritics
+  assert.equal(
+    matchesBilingualSearch('احمد', 'Ahmed Ibrahim', 'أحمد إبراهيم', 'ahmed@meis.sch.sa'),
+    true
+  );
+  // Matches English case-insensitively
+  assert.equal(
+    matchesBilingualSearch('ibrahim', 'Ahmed Ibrahim', 'أحمد إبراهيم', 'ahmed@meis.sch.sa'),
+    true
+  );
+  // Multi-token match across fields
+  assert.equal(
+    matchesBilingualSearch('ahmed إبراهيم', 'Ahmed Ibrahim', 'أحمد إبراهيم'),
+    true
+  );
+  assert.equal(
+    matchesBilingualSearch('khalid', 'Ahmed Ibrahim', 'أحمد إبراهيم'),
+    false
+  );
+  assert.equal(matchesBilingualSearch('   ', 'Ahmed Ibrahim', 'أحمد إبراهيم'), true);
+});

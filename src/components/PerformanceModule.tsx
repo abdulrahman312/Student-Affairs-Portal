@@ -21,7 +21,7 @@ import type {
 import { getLocalizedDisplayName, getLocalizedName, tr } from '../utils/i18n';
 import { exportPerformanceReportPdf } from '../utils/pdfExport';
 import { getRiyadhParts } from '../utils/riyadhTime';
-import { buildWhatsAppUrl, getRoleScope } from '../utils/schoolRules';
+import { buildWhatsAppUrl, getRoleScope, matchesBilingualSearch } from '../utils/schoolRules';
 
 export const PerformanceModule: React.FC = () => {
   const {
@@ -57,6 +57,7 @@ export const PerformanceModule: React.FC = () => {
 
   // Preview modal
   const [previewReq, setPreviewReq] = useState<PerformanceRequest | null>(null);
+  const [trackerSearchQuery, setTrackerSearchQuery] = useState('');
 
   const activeRole = userProfile?.active_role || 'teacher';
   const canRequest =
@@ -110,18 +111,12 @@ export const PerformanceModule: React.FC = () => {
   const profMap = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
 
   const matchingRequestStudents = useMemo(() => {
-    const q = searchIqama.trim().toLowerCase();
     const activeGrade = reqGradeId && scope.gradeIds.has(reqGradeId) ? reqGradeId : '';
     const activeSection = reqSectionId && scope.sectionIds.has(reqSectionId) ? reqSectionId : '';
     return scope.students.filter((s) => {
       if (activeGrade && s.grade_id !== activeGrade) return false;
       if (activeSection && s.section_id !== activeSection) return false;
-      if (!q) return true;
-      return (
-        s.iqama_id.toLowerCase().includes(q) ||
-        s.name_en.toLowerCase().includes(q) ||
-        s.name_ar.toLowerCase().includes(q)
-      );
+      return matchesBilingualSearch(searchIqama, s.iqama_id, s.name_en, s.name_ar);
     });
   }, [scope, searchIqama, reqGradeId, reqSectionId]);
 
@@ -273,9 +268,23 @@ export const PerformanceModule: React.FC = () => {
   );
 
   const scopedRequests = useMemo(() => {
-    if (scope.isUnrestricted) return requests;
-    return requests.filter((r) => scopedStudentIds.has(r.student_id));
-  }, [requests, scope.isUnrestricted, scopedStudentIds]);
+    const base = scope.isUnrestricted
+      ? requests
+      : requests.filter((r) => scopedStudentIds.has(r.student_id));
+    if (!trackerSearchQuery.trim()) return base;
+    return base.filter((req) => {
+      const st = studentMap.get(req.student_id);
+      const cs = st ? classMap.get(st.class_section_id) : undefined;
+      return matchesBilingualSearch(
+        trackerSearchQuery,
+        st?.name_en,
+        st?.name_ar,
+        st?.iqama_id,
+        cs?.display_name_en,
+        cs?.display_name_ar
+      );
+    });
+  }, [requests, scope.isUnrestricted, scopedStudentIds, trackerSearchQuery, studentMap, classMap]);
 
   const handleDownloadPdf = async (req: PerformanceRequest) => {
     const st = studentMap.get(req.student_id);
@@ -517,9 +526,25 @@ export const PerformanceModule: React.FC = () => {
       {/* Active & Completed Requests Tracker (Principal, Academic Supervisor, Supervisor, Admin) */}
       {canViewTracker && (
         <section className="meis-glass rounded-2xl p-5">
-          <h2 className="text-base font-bold text-slate-900 pb-3 border-b border-slate-200/80">
-            {lang === 'ar' ? 'متابعة تقارير الأداء المطلوبة' : 'Requested Reports Progress'}
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+            <h2 className="text-base font-bold text-slate-900">
+              {lang === 'ar' ? 'متابعة تقارير الأداء المطلوبة' : 'Requested Reports Progress'}
+            </h2>
+            <div className="relative w-full sm:w-72">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+              <input
+                type="text"
+                value={trackerSearchQuery}
+                onChange={(e) => setTrackerSearchQuery(e.target.value)}
+                placeholder={
+                  lang === 'ar'
+                    ? 'بحث بالطالب (عربي/إنجليزي) أو الإقامة...'
+                    : 'Search student (EN/AR) or ID...'
+                }
+                className="w-full ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+              />
+            </div>
+          </div>
 
           <div className="mt-4 space-y-3">
             {loading ? (

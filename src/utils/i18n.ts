@@ -78,6 +78,7 @@ export const UI_TEXT = {
   close: { ar: 'إغلاق', en: 'Close' },
   whatsappFather: { ar: 'واتساب ولي الأمر', en: 'WhatsApp Father' },
   exportPdfEnglish: { ar: 'تصدير PDF (إنجليزي)', en: 'Export Report (PDF)' },
+  profileSettings: { ar: 'إعدادات الحساب', en: 'Profile Settings' },
 } as const;
 
 export function tr(key: keyof typeof UI_TEXT, lang: Language): string {

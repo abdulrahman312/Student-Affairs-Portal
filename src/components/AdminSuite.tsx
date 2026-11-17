@@ -20,6 +20,7 @@ import type { Profile, Student, UserRole } from '../types/database';
 import { getLocalizedDisplayName, getLocalizedName, ROLE_LABELS, tr } from '../utils/i18n';
 import {
   buildStaffAssignmentRows,
+  matchesBilingualSearch,
   parseStudentExcelRows,
   validateRoleConfiguration,
   type ParsedStudentRow,
@@ -367,13 +368,9 @@ export const AdminSuite: React.FC = () => {
   };
 
   const filteredProfiles = useMemo(() => {
-    const q = userSearch.trim().toLowerCase();
-    if (!q) return profiles;
-    return profiles.filter(
-      (p) =>
-        p.email.toLowerCase().includes(q) ||
-        p.name_en.toLowerCase().includes(q) ||
-        p.name_ar.toLowerCase().includes(q)
+    if (!userSearch.trim()) return profiles;
+    return profiles.filter((p) =>
+      matchesBilingualSearch(userSearch, p.email, p.name_en, p.name_ar)
     );
   }, [profiles, userSearch]);
 
@@ -480,16 +477,10 @@ export const AdminSuite: React.FC = () => {
   };
 
   const filteredStudents = useMemo(() => {
-    const q = studentSearch.trim().toLowerCase();
     return students.filter((s) => {
       if (studentGradeFilter && s.grade_id !== studentGradeFilter) return false;
       if (studentSectionFilter && s.section_id !== studentSectionFilter) return false;
-      if (!q) return true;
-      return (
-        s.iqama_id.toLowerCase().includes(q) ||
-        s.name_ar.toLowerCase().includes(q) ||
-        s.name_en.toLowerCase().includes(q)
-      );
+      return matchesBilingualSearch(studentSearch, s.iqama_id, s.name_ar, s.name_en);
     });
   }, [students, studentSearch, studentGradeFilter, studentSectionFilter]);
 

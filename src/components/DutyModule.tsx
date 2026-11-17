@@ -1,11 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ClipboardCheck, MapPin, Plus, Trash2 } from 'lucide-react';
+import { ClipboardCheck, MapPin, Plus, Search, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import type { DutyAssignment } from '../types/database';
 import { getLocalizedName, tr } from '../utils/i18n';
 import { getRiyadhParts } from '../utils/riyadhTime';
-import { filterTeachersInScope, getRoleScope, isDateInRange } from '../utils/schoolRules';
+import {
+  filterTeachersInScope,
+  getRoleScope,
+  isDateInRange,
+  matchesBilingualSearch,
+} from '../utils/schoolRules';
 
 export const DutyModule: React.FC = () => {
   const {
@@ -26,6 +31,8 @@ export const DutyModule: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [teacherId, setTeacherId] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [dutyListSearch, setDutyListSearch] = useState('');
   const [dutyTypeId, setDutyTypeId] = useState('');
   const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
   const [startDate, setStartDate] = useState(riyadhToday);
@@ -75,6 +82,13 @@ export const DutyModule: React.FC = () => {
     if (!teacherId && teachersList.length > 0) setTeacherId(teachersList[0].id);
   }, [dutyTypes, teachersList, dutyTypeId, teacherId]);
 
+  const filteredTeachersList = useMemo(() => {
+    if (!teacherSearch.trim()) return teachersList;
+    return teachersList.filter((t) =>
+      matchesBilingualSearch(teacherSearch, t.name_en, t.name_ar, t.email)
+    );
+  }, [teachersList, teacherSearch]);
+
   const profMap = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
   const dutyTypeMap = useMemo(() => new Map(dutyTypes.map((d) => [d.id, d])), [dutyTypes]);
 
@@ -86,13 +100,40 @@ export const DutyModule: React.FC = () => {
   }, [duties, userProfile, riyadhToday]);
 
   const visibleDuties = useMemo(() => {
-    if (!canAssign) return duties.filter((d) => d.teacher_id === userProfile?.id);
-    if (scope.isUnrestricted) return duties;
-    const allowedTeacherIds = new Set(teachersList.map((t) => t.id));
-    return duties.filter(
-      (d) => allowedTeacherIds.has(d.teacher_id) || d.assigned_by === userProfile?.id
-    );
-  }, [duties, canAssign, userProfile, scope.isUnrestricted, teachersList]);
+    const scoped = !canAssign
+      ? duties.filter((d) => d.teacher_id === userProfile?.id)
+      : scope.isUnrestricted
+        ? duties
+        : (() => {
+            const allowedTeacherIds = new Set(teachersList.map((t) => t.id));
+            return duties.filter(
+              (d) => allowedTeacherIds.has(d.teacher_id) || d.assigned_by === userProfile?.id
+            );
+          })();
+    if (!dutyListSearch.trim()) return scoped;
+    return scoped.filter((d) => {
+      const t = profMap.get(d.teacher_id);
+      const dt = dutyTypeMap.get(d.duty_type_id);
+      return matchesBilingualSearch(
+        dutyListSearch,
+        t?.name_en,
+        t?.name_ar,
+        t?.email,
+        dt?.name_en,
+        dt?.name_ar,
+        d.location_text
+      );
+    });
+  }, [
+    duties,
+    canAssign,
+    userProfile,
+    scope.isUnrestricted,
+    teachersList,
+    dutyListSearch,
+    profMap,
+    dutyTypeMap,
+  ]);
 
   const handleAssignDuty = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,20 +237,41 @@ export const DutyModule: React.FC = () => {
           <form onSubmit={handleAssignDuty} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {lang === 'ar' ? 'المعلم' : 'Teacher'}
+                {lang === 'ar' ? 'المعلم (بحث عربي/إنجليزي)' : 'Teacher (Search EN/AR)'}
               </label>
-              <select
-                required
-                value={teacherId}
-                onChange={(e) => setTeacherId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
-              >
-                {teachersList.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {getLocalizedName(t, lang)}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                  <input
+                    type="text"
+                    value={teacherSearch}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTeacherSearch(val);
+                      const firstMatch = teachersList.find((t) =>
+                        matchesBilingualSearch(val, t.name_en, t.name_ar, t.email)
+                      );
+                      if (firstMatch) setTeacherId(firstMatch.id);
+                    }}
+                    placeholder={
+                      lang === 'ar' ? 'ابحث باسم المعلم...' : 'Search teacher EN / AR...'
+                    }
+                    className="w-full ps-8 pe-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs"
+                  />
+                </div>
+                <select
+                  required
+                  value={teacherId}
+                  onChange={(e) => setTeacherId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                >
+                  {filteredTeachersList.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {getLocalizedName(t, lang)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>
@@ -320,15 +382,31 @@ export const DutyModule: React.FC = () => {
 
       {/* Duties Table */}
       <section className="meis-glass rounded-2xl p-5">
-        <h2 className="text-base font-bold text-slate-900 pb-3 border-b border-slate-200/80">
-          {canAssign
-            ? lang === 'ar'
-              ? 'سجل المناوبات المجدولة'
-              : 'All Scheduled Duty Assignments'
-            : lang === 'ar'
-              ? 'جدول مناوباتي'
-              : 'My Duty Schedule'}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+          <h2 className="text-base font-bold text-slate-900">
+            {canAssign
+              ? lang === 'ar'
+                ? 'سجل المناوبات المجدولة'
+                : 'All Scheduled Duty Assignments'
+              : lang === 'ar'
+                ? 'جدول مناوباتي'
+                : 'My Duty Schedule'}
+          </h2>
+          <div className="relative w-full sm:w-72">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+            <input
+              type="text"
+              value={dutyListSearch}
+              onChange={(e) => setDutyListSearch(e.target.value)}
+              placeholder={
+                lang === 'ar'
+                  ? 'بحث بالمعلم أو الموقع (عربي/إنجليزي)...'
+                  : 'Search teacher (EN/AR) or location...'
+              }
+              className="w-full ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+            />
+          </div>
+        </div>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">

@@ -19,6 +19,7 @@ import {
   buildWhatsAppUrl,
   computeBehaviorWatchlist,
   getRoleScope,
+  matchesBilingualSearch,
   type WatchlistTimeframe,
 } from '../utils/schoolRules';
 
@@ -44,6 +45,7 @@ export const BehaviorModule: React.FC = () => {
   // Record Incident Form State
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [recordClassId, setRecordClassId] = useState('');
+  const [recordStudentSearch, setRecordStudentSearch] = useState('');
   const [recordStudentId, setRecordStudentId] = useState('');
   const [recordCategoryId, setRecordCategoryId] = useState('');
   const [recordPeriod, setRecordPeriod] = useState<string>('');
@@ -53,6 +55,7 @@ export const BehaviorModule: React.FC = () => {
 
   // Watchlist & Search State
   const [timeframe, setTimeframe] = useState<WatchlistTimeframe>('today');
+  const [feedSearchQuery, setFeedSearchQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterGradeId, setFilterGradeId] = useState('');
   const [filterSectionId, setFilterSectionId] = useState('');
@@ -95,9 +98,16 @@ export const BehaviorModule: React.FC = () => {
   const availableRecordClasses = scope.classSections;
 
   const studentsInSelectedClass = useMemo(() => {
-    if (!recordClassId || !scope.classSectionIds.has(recordClassId)) return [];
-    return scope.students.filter((s) => s.class_section_id === recordClassId);
-  }, [scope, recordClassId]);
+    const base = recordClassId
+      ? scope.classSectionIds.has(recordClassId)
+        ? scope.students.filter((s) => s.class_section_id === recordClassId)
+        : []
+      : scope.students;
+    if (!recordStudentSearch.trim()) return base;
+    return base.filter((s) =>
+      matchesBilingualSearch(recordStudentSearch, s.name_en, s.name_ar, s.iqama_id)
+    );
+  }, [scope, recordClassId, recordStudentSearch]);
 
   const activeCategories = useMemo(
     () => behaviorCategories.filter((c) => c.is_active),
@@ -127,10 +137,27 @@ export const BehaviorModule: React.FC = () => {
   }, [logs, userProfile, activeRole, scope]);
 
   const todaysFeed = useMemo(() => {
-    return scopedLogs.filter(
+    const todayLogs = scopedLogs.filter(
       (l) => getRiyadhParts(new Date(l.created_at)).dateStr === riyadhToday
     );
-  }, [scopedLogs, riyadhToday]);
+    if (!feedSearchQuery.trim()) return todayLogs;
+    return todayLogs.filter((log) => {
+      const st = studentMap.get(log.student_id);
+      const teacher = profMap.get(log.teacher_id);
+      const cat = catMap.get(log.behavior_category_id);
+      return matchesBilingualSearch(
+        feedSearchQuery,
+        st?.name_en,
+        st?.name_ar,
+        st?.iqama_id,
+        teacher?.name_en,
+        teacher?.name_ar,
+        cat?.name_en,
+        cat?.name_ar,
+        log.notes
+      );
+    });
+  }, [scopedLogs, riyadhToday, feedSearchQuery, studentMap, profMap, catMap]);
 
   const watchlist = useMemo(() => {
     return computeBehaviorWatchlist({
@@ -143,7 +170,6 @@ export const BehaviorModule: React.FC = () => {
   }, [scopedLogs, scope.students, timeframe, riyadhToday, threshold]);
 
   const filteredStudents = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
     const activeGradeFilter =
       filterGradeId && scope.gradeIds.has(filterGradeId) ? filterGradeId : '';
     const activeSectionFilter =
@@ -151,12 +177,7 @@ export const BehaviorModule: React.FC = () => {
     return scope.students.filter((s) => {
       if (activeGradeFilter && s.grade_id !== activeGradeFilter) return false;
       if (activeSectionFilter && s.section_id !== activeSectionFilter) return false;
-      if (!q) return true;
-      return (
-        s.iqama_id.toLowerCase().includes(q) ||
-        s.name_en.toLowerCase().includes(q) ||
-        s.name_ar.toLowerCase().includes(q)
-      );
+      return matchesBilingualSearch(searchQuery, s.iqama_id, s.name_en, s.name_ar);
     });
   }, [scope, searchQuery, filterGradeId, filterSectionId]);
 
@@ -182,7 +203,7 @@ export const BehaviorModule: React.FC = () => {
     if (!userProfile) return;
     setFormMsg(null);
 
-    if (!recordClassId || !recordStudentId || !recordCategoryId) {
+    if ((!recordClassId && !recordStudentId) || !recordStudentId || !recordCategoryId) {
       setFormMsg({
         type: 'err',
         text:
@@ -195,10 +216,12 @@ export const BehaviorModule: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const targetStudent = studentMap.get(recordStudentId);
+      const effectiveClassId = recordClassId || targetStudent?.class_section_id || '';
       const { error } = await supabase.from('behavior_logs').insert({
         student_id: recordStudentId,
         teacher_id: userProfile.id,
-        class_section_id: recordClassId,
+        class_section_id: effectiveClassId,
         subject_id: userProfile.primary_subject_id || null,
         behavior_category_id: recordCategoryId,
         period_number: recordPeriod ? Number(recordPeriod) : null,
@@ -308,7 +331,6 @@ export const BehaviorModule: React.FC = () => {
                 {lang === 'ar' ? 'الفصل الدراسي' : 'Class Section'}
               </label>
               <select
-                required
                 value={recordClassId}
                 onChange={(e) => {
                   setRecordClassId(e.target.value);
@@ -316,7 +338,7 @@ export const BehaviorModule: React.FC = () => {
                 }}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
               >
-                <option value="">{lang === 'ar' ? '-- اختر الفصل --' : '-- Select Class --'}</option>
+                <option value="">{lang === 'ar' ? 'كل الفصول المسندة' : 'All Assigned Classes'}</option>
                 {availableRecordClasses.map((cs) => (
                   <option key={cs.id} value={cs.id}>
                     {getLocalizedDisplayName(cs, lang)}
@@ -327,24 +349,45 @@ export const BehaviorModule: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {lang === 'ar' ? 'الطالب' : 'Student'}
+                {lang === 'ar' ? 'بحث واختيار الطالب (عربي / إنجليزي)' : 'Search & Select Student (EN/AR)'}
               </label>
-              <select
-                required
-                disabled={!recordClassId}
-                value={recordStudentId}
-                onChange={(e) => setRecordStudentId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm disabled:bg-slate-100"
-              >
-                <option value="">
-                  {lang === 'ar' ? '-- اختر الطالب --' : '-- Select Student --'}
-                </option>
-                {studentsInSelectedClass.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {getLocalizedName(st, lang)} ({st.iqama_id})
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                  <input
+                    type="text"
+                    value={recordStudentSearch}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRecordStudentSearch(val);
+                    }}
+                    placeholder={
+                      lang === 'ar' ? 'ابحث باسم الطالب أو الإقامة...' : 'Search student EN / AR / ID...'
+                    }
+                    className="w-full ps-8 pe-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs"
+                  />
+                </div>
+                <select
+                  required
+                  value={recordStudentId}
+                  onChange={(e) => {
+                    const stId = e.target.value;
+                    setRecordStudentId(stId);
+                    const st = studentMap.get(stId);
+                    if (st && !recordClassId) setRecordClassId(st.class_section_id);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                >
+                  <option value="">
+                    {lang === 'ar' ? '-- اختر الطالب --' : '-- Select Student --'}
                   </option>
-                ))}
-              </select>
+                  {studentsInSelectedClass.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {getLocalizedName(st, lang)} ({st.iqama_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>
@@ -532,7 +575,7 @@ export const BehaviorModule: React.FC = () => {
         <section
           className={`${canSupervise ? 'lg:col-span-7' : 'lg:col-span-12'} meis-glass rounded-2xl p-5`}
         >
-          <div className="flex items-center justify-between pb-4 border-b border-slate-200/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/80">
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {lang === 'ar' ? 'سجل مخالفات اليوم' : "Today's Behavior Feed"}
@@ -541,6 +584,18 @@ export const BehaviorModule: React.FC = () => {
                 {riyadhToday} · {todaysFeed.length}{' '}
                 {lang === 'ar' ? 'مخالفة مسجلة' : 'logged today'}
               </p>
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+              <input
+                type="text"
+                value={feedSearchQuery}
+                onChange={(e) => setFeedSearchQuery(e.target.value)}
+                placeholder={
+                  lang === 'ar' ? 'بحث بالطالب أو المعلم...' : 'Search student or teacher (EN/AR)...'
+                }
+                className="w-full ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+              />
             </div>
           </div>
 
