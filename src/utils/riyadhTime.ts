@@ -173,3 +173,42 @@ export function getSchoolWeekBounds(anchorDateStr: string): {
   };
 }
 
+export interface MonthFilterOption {
+  monthStr: string; // YYYY-MM
+  labelEn: string;
+  labelAr: string;
+  isCurrent: boolean;
+}
+
+export function getRecentMonths(now: Date = new Date(), count = 12): MonthFilterOption[] {
+  const { year, month } = getRiyadhParts(now);
+  const results: MonthFilterOption[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const dt = new Date(Date.UTC(year, month - 1 - i, 15));
+    const y = dt.getUTCFullYear();
+    const m = dt.getUTCMonth() + 1;
+    const monthStr = `${y}-${String(m).padStart(2, '0')}`;
+    const labelEn = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'UTC',
+      month: 'long',
+      year: 'numeric',
+    }).format(dt);
+  const labelAr = new Intl.DateTimeFormat('ar-SA-u-nu-latn', {
+      timeZone: 'UTC',
+      month: 'long',
+      year: 'numeric',
+    }).format(dt);
+
+    results.push({
+      monthStr,
+      labelEn,
+      labelAr,
+      isCurrent: i === 0,
+    });
+  }
+
+  return results;
+}
+
+

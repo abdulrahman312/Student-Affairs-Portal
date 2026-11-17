@@ -647,3 +647,95 @@ export function matchesBilingualSearch(
   return tokens.every((token) => normalizedFields.some((field) => field.includes(token)));
 }
 
+export type BehaviorLevel = 'green' | 'orange' | 'red';
+
+/**
+ * Classroom Behavior Status Levels:
+ * - 0 behaviors -> 'green'
+ * - 1..5 behaviors -> 'orange'
+ * - > 5 behaviors -> 'red'
+ */
+export function getBehaviorLevel(count: number): BehaviorLevel {
+  if (count <= 0) return 'green';
+  if (count <= 5) return 'orange';
+  return 'red';
+}
+
+export interface ClassroomStudentBehaviorRow {
+  student: Student;
+  logs: BehaviorLog[];
+  count: number;
+  level: BehaviorLevel;
+}
+
+export function getMonthlyClassBehaviorRows(params: {
+  students: Student[];
+  logs: BehaviorLog[];
+  classSectionId: string;
+  monthStr: string;
+  lang?: Language;
+}): ClassroomStudentBehaviorRow[] {
+  const { students, logs, classSectionId, monthStr, lang = 'en' } = params;
+  if (!classSectionId) return [];
+
+  const classStudents = students
+    .filter((s) => s.class_section_id === classSectionId)
+    .slice()
+    .sort((a, b) => {
+      const nameA = lang === 'ar' ? a.name_ar || a.name_en : a.name_en || a.name_ar;
+      const nameB = lang === 'ar' ? b.name_ar || b.name_en : b.name_en || b.name_ar;
+      return nameA.localeCompare(nameB);
+    });
+
+  const classStudentIds = new Set(classStudents.map((s) => s.id));
+  const logsByStudent = new Map<string, BehaviorLog[]>();
+
+  for (const log of logs) {
+    if (!classStudentIds.has(log.student_id) && log.class_section_id !== classSectionId) continue;
+    const logMonth = getRiyadhParts(new Date(log.created_at)).monthStr;
+    if (logMonth !== monthStr) continue;
+    const list = logsByStudent.get(log.student_id) || [];
+    list.push(log);
+    logsByStudent.set(log.student_id, list);
+  }
+
+  return classStudents.map((student) => {
+    const studentLogs = (logsByStudent.get(student.id) || [])
+      .slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const count = studentLogs.length;
+    return {
+      student,
+      logs: studentLogs,
+      count,
+      level: getBehaviorLevel(count),
+    };
+  });
+}
+
+export function filterBehaviorLogsForReport(params: {
+  logs: BehaviorLog[];
+  fromDate: string;
+  toDate: string;
+  teacherOnlyId?: string;
+  classSectionId?: string;
+  studentClassMap?: Map<string, string>;
+}): BehaviorLog[] {
+  const { logs, fromDate, toDate, teacherOnlyId, classSectionId, studentClassMap } = params;
+
+  return logs
+    .filter((log) => {
+      if (teacherOnlyId && log.teacher_id !== teacherOnlyId) return false;
+      if (classSectionId) {
+        const effectiveClassId = log.class_section_id || studentClassMap?.get(log.student_id);
+        if (effectiveClassId !== classSectionId) return false;
+      }
+      const riyadhDate = getRiyadhParts(new Date(log.created_at)).dateStr;
+      if (fromDate && riyadhDate < fromDate) return false;
+      if (toDate && riyadhDate > toDate) return false;
+      return true;
+    })
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+

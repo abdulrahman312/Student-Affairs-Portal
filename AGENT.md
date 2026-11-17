@@ -15,7 +15,7 @@
 ├── index.html                        # Entry HTML (default lang="ar" dir="rtl", Cairo + Plus Jakarta Sans)
 ├── src/
 │   ├── main.tsx                      # React 19 root mount
-│   ├── App.tsx                       # Root routing between Auth, Onboarding, and App Shell
+│   ├── App.tsx                       # Root routing: Public ClassroomHomeScreen, AuthScreen, Onboarding, App Shell
 │   ├── index.css                     # Tailwind CSS v4 + 5-Theme CSS variables & Bento glass surfaces
 │   ├── assets/images/                # Generated MEIS school crest emblem
 │   ├── lib/
@@ -24,21 +24,22 @@
 │   │   └── database.ts               # TypeScript models matching live PostgreSQL tables
 │   ├── utils/
 │   │   ├── i18n.ts                   # Bilingual AR/EN dictionary & localized field resolver
-│   │   ├── riyadhTime.ts             # Asia/Riyadh (UTC+3) clock, Sun–Thu calendar & active bell helper
-│   │   ├── schoolRules.ts            # Pure business logic (conflicts, watchlist, Excel parser, WhatsApp)
+│   │   ├── riyadhTime.ts             # Asia/Riyadh (UTC+3) clock, Sun–Thu calendar, recent months & active bell helper
+│   │   ├── schoolRules.ts            # Pure business logic (conflicts, watchlist, classroom levels, Excel parser, WhatsApp)
 │   │   ├── schoolRules.test.ts       # Deterministic unit tests (node:test)
 │   │   ├── themes.ts                 # 5-Theme Color System definitions & localStorage key
-│   │   └── pdfExport.ts              # Strictly English-only PDF exports (jspdf + jspdf-autotable)
+│   │   └── pdfExport.ts              # Strictly English-only PDF exports (student, teacher range, class range, performance, absences)
 │   ├── context/
-│   │   └── AppContext.tsx            # Auth, dummy login/impersonation, role switching, theme sync, master data
+│   │   └── AppContext.tsx            # Auth (@meis.sch.sa Google OAuth enforcement, email sign-in, dummy login), role switching, theme sync, master data
 │   └── components/
-│       ├── AuthScreen.tsx            # Split 2-col glass card: Google OAuth, @meis.sch.sa auth, dummy login
+│       ├── ClassroomHomeScreen.tsx   # Public unauthenticated classroom screen: any class, current/previous month behavior counts, expandable teacher details, Green/Orange/Red levels, refresh & Staff Sign-In button
+│       ├── AuthScreen.tsx            # Split 2-col glass card: Google-only @meis.sch.sa sign-up/sign-in + email sign-in form (for existing/dummy accounts)
 │       ├── OnboardingWizard.tsx      # 3-step onboarding (role, AR/EN names, subject/classes/division)
 │       ├── LayoutShell.tsx           # Floating pill top nav bar + mobile drawer/dock + Riyadh clock header
 │       ├── NoticeBoardSection.tsx    # Active notice banner/carousel + Notice CRUD modal
 │       ├── DashboardHome.tsx         # Executive Bento dashboard (KPI pills, charts, dark watchlist, schedule)
 │       ├── ProfileSettingsModal.tsx  # Self-service profile & class assignment modal
-│       ├── BehaviorModule.tsx        # Recording, feed, watchlist, student profile, WhatsApp & PDF
+│       ├── BehaviorModule.tsx        # Recording, feed, watchlist, student profile, teacher-isolated & class-wide date-range PDF reports
 │       ├── PerformanceModule.tsx     # Report requests, teacher comments, tracker, 2-col English PDF
 │       ├── TimetableSubstitutionModule.tsx # Sun-Thu P1-7 grid, period-only conflict check, substitutions
 │       ├── DutyModule.tsx            # Single/range duty assignments with location_text
@@ -100,8 +101,12 @@ The platform defines 5 roles:
 5. `admin` — 100% system control: manages users & multi-roles, creates & impersonates dummy test accounts, imports `.xlsx` students (6-column UPSERT on `iqama_id`), edits all master data tables, and manages global operational records.
 
 **Special Rules:**
+- **Public Classroom Homescreen (`ClassroomHomeScreen.tsx`):** Opens without sign-in so teachers can display any class on large classroom screens while signing in from mobile to log behaviors. Shows monthly student behavior counts with an expandable arrow listing each incident and recording teacher, status levels (`0` = Green, `1–5` = Orange, `>5` = Red), a previous-months filter, a manual refresh button, and a Staff Sign-In button.
+- **Google-Only `@meis.sch.sa` Sign-Up & Domain Enforcement:** New user sign-up uses Google OAuth exclusively; `AppContext` passes `hd: allowedDomain` and immediately signs out/rejects any OAuth account not ending in `@meis.sch.sa` (or `school_settings.allowed_email_domain`). Email/password sign-in remains active for existing staff and Admin-created dummy test accounts.
+- **Role-Scoped Behavior Visibility & Date-Range PDF Reports:** When signed in as `teacher`, `BehaviorModule` and `DashboardHome` display and export only behaviors recorded by that teacher (`teacher_id === userProfile.id`) across any chosen date range. `supervisor`, `academic_supervisor`, `principal`, and `admin` roles can generate class-wide date-range PDF reports showing every student's incidents across all recording teachers.
 - **Onboarding Security:** `admin` is **never** selectable during self-service onboarding. Only an existing `admin` may grant the `admin` role.
 - **Root Super-Admin Email:** Any session with `abdulrahman@meis.sch.sa` automatically receives all 5 roles (`['admin', 'teacher', 'supervisor', 'academic_supervisor', 'principal']`).
 - **Multi-Role Switching:** `profiles.roles` holds an array of roles; `profiles.active_role` controls the active dashboard view. When `roles.length > 1`, the top header exposes an instant Role Switcher dropdown.
 - **Period-Only Conflict Logic:** Timetable conflicts and substitution availability check **only** `day_of_week` (0–4) and `period_number` (1–7), deliberately ignoring clock-time differences between Lower and Upper divisions.
 - **English-Only PDFs:** All `jspdf` exports must render strictly in English with the MEIS school crest and `"Middle East International School"` header.
+

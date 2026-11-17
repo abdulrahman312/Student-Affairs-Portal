@@ -45,6 +45,8 @@ interface AppContextValue {
   setTheme: (theme: PortalThemeId) => void;
   authLoading: boolean;
   masterLoading: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   userProfile: Profile | null;
   realAdminProfile: Profile | null;
   isImpersonating: boolean;
@@ -92,8 +94,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [authLoading, setAuthLoading] = useState(true);
   const [masterLoading, setMasterLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [realAdminProfile, setRealAdminProfile] = useState<Profile | null>(null);
+
+  const clearAuthError = useCallback(() => setAuthError(null), []);
 
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -251,6 +256,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (authUser) {
         const email = (authUser.email || '').toLowerCase();
+        let allowedDomain = schoolSettings?.allowed_email_domain || '';
+        if (!allowedDomain) {
+          const { data: settingsRow } = await supabase
+            .from('school_settings')
+            .select('allowed_email_domain')
+            .limit(1)
+            .maybeSingle();
+          allowedDomain = settingsRow?.allowed_email_domain || 'meis.sch.sa';
+        }
+
+        if (!isAllowedSchoolEmail(email, allowedDomain)) {
+          await supabase.auth.signOut();
+          localStorage.removeItem(DUMMY_PROFILE_KEY);
+          localStorage.removeItem(IMPERSONATE_PROFILE_KEY);
+          setRealAdminProfile(null);
+          setUserProfile(null);
+          setAuthError(
+            lang === 'ar'
+              ? `تم رفض الدخول: يُسمح فقط بحسابات المدرسة الرسمية المنتهية بـ @${allowedDomain}`
+              : `Access denied: Only official school accounts ending with @${allowedDomain} are permitted.`
+          );
+          return;
+        }
+
+        setAuthError(null);
+
         // Check if profile exists by id or email
         const { data: existingById } = await supabase
           .from('profiles')
@@ -329,7 +360,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } finally {
       if (!silent) setAuthLoading(false);
     }
-  }, [ensureSuperAdminRoles]);
+  }, [ensureSuperAdminRoles, lang, schoolSettings?.allowed_email_domain]);
 
   const refreshCurrentProfile = useCallback(async () => {
     await resolveProfileSession({ silent: true });
@@ -349,14 +380,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [refreshMasterData, resolveProfileSession]);
 
   const signInWithGoogle = useCallback(async () => {
+    setAuthError(null);
+    const allowedDomain = schoolSettings?.allowed_email_domain || 'meis.sch.sa';
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: window.location.origin,
+        queryParams: {
+          hd: allowedDomain,
+          prompt: 'select_account',
+        },
       },
     });
     return { error: error ? error.message : null };
-  }, []);
+  }, [schoolSettings?.allowed_email_domain]);
 
   const signInWithEmail = useCallback(
     async (emailInput: string, password: string) => {
@@ -541,6 +578,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTheme,
         authLoading,
         masterLoading,
+        authError,
+        clearAuthError,
         userProfile,
         realAdminProfile,
         isImpersonating: Boolean(realAdminProfile),

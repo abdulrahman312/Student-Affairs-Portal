@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Calendar,
   FileDown,
   MessageCircle,
   Plus,
@@ -13,11 +14,17 @@ import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import type { BehaviorLog, Student } from '../types/database';
 import { getLocalizedDisplayName, getLocalizedName, tr } from '../utils/i18n';
-import { exportBehaviorReportPdf } from '../utils/pdfExport';
+import {
+  exportBehaviorReportPdf,
+  exportClassBehaviorRangePdf,
+  exportTeacherBehaviorRangePdf,
+} from '../utils/pdfExport';
 import { getRiyadhParts } from '../utils/riyadhTime';
 import {
   buildWhatsAppUrl,
   computeBehaviorWatchlist,
+  filterBehaviorLogsForReport,
+  getBehaviorLevel,
   getRoleScope,
   matchesBilingualSearch,
   type WatchlistTimeframe,
@@ -62,19 +69,41 @@ export const BehaviorModule: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  const riyadhToday = getRiyadhParts(new Date()).dateStr;
+  const riyadhParts = getRiyadhParts(new Date());
+  const riyadhToday = riyadhParts.dateStr;
+  const riyadhMonthStart = `${riyadhParts.monthStr}-01`;
+
+  // Date-Range Report & Export State
+  const [reportFromDate, setReportFromDate] = useState<string>(riyadhMonthStart);
+  const [reportToDate, setReportToDate] = useState<string>(riyadhToday);
+  const [reportClassId, setReportClassId] = useState<string>('');
+  const [exportingRangePdf, setExportingRangePdf] = useState(false);
+
   const threshold = schoolSettings?.high_behavior_threshold ?? 3;
   const activeRole = userProfile?.active_role || 'teacher';
   const canSupervise = activeRole !== 'teacher';
 
   const loadLogs = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('behavior_logs')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setLogs(data as BehaviorLog[]);
-    setLoading(false);
+    try {
+      const pageSize = 1000;
+      const all: BehaviorLog[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('behavior_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        all.push(...(data as BehaviorLog[]));
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      setLogs(all);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -97,6 +126,16 @@ export const BehaviorModule: React.FC = () => {
 
   const availableRecordClasses = scope.classSections;
 
+  // Ensure supervisors/principals/admins default to their first scoped class for Class Behavior Report
+  useEffect(() => {
+    if (canSupervise && availableRecordClasses.length > 0) {
+      const exists = availableRecordClasses.some((c) => c.id === reportClassId);
+      if (!exists) {
+        setReportClassId(availableRecordClasses[0].id);
+      }
+    }
+  }, [canSupervise, availableRecordClasses, reportClassId]);
+
   const studentsInSelectedClass = useMemo(() => {
     const base = recordClassId
       ? scope.classSectionIds.has(recordClassId)
@@ -116,6 +155,10 @@ export const BehaviorModule: React.FC = () => {
 
   // Maps for quick lookup
   const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
+  const studentClassMap = useMemo(
+    () => new Map(students.map((s) => [s.id, s.class_section_id])),
+    [students]
+  );
   const classMap = useMemo(() => new Map(classSections.map((c) => [c.id, c])), [classSections]);
   const catMap = useMemo(
     () => new Map(behaviorCategories.map((c) => [c.id, c])),
@@ -125,14 +168,12 @@ export const BehaviorModule: React.FC = () => {
   const profMap = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
 
   const scopedLogs = useMemo(() => {
-    if (!userProfile || scope.isUnrestricted) return logs;
+    if (!userProfile) return [];
+    // Teachers strictly see ONLY behavior logs recorded by themselves (not by other teachers)
     if (activeRole === 'teacher') {
-      return logs.filter(
-        (l) =>
-          scope.classSectionIds.has(l.class_section_id) ||
-          (scope.classSectionIds.size === 0 && l.teacher_id === userProfile.id)
-      );
+      return logs.filter((l) => l.teacher_id === userProfile.id);
     }
+    if (scope.isUnrestricted) return logs;
     return logs.filter((l) => scope.classSectionIds.has(l.class_section_id));
   }, [logs, userProfile, activeRole, scope]);
 
@@ -183,10 +224,74 @@ export const BehaviorModule: React.FC = () => {
 
   const selectedStudentLogs = useMemo(() => {
     if (!selectedStudent) return [];
-    return logs
+    return scopedLogs
       .filter((l) => l.student_id === selectedStudent.id)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  }, [logs, selectedStudent]);
+  }, [scopedLogs, selectedStudent]);
+
+  const reportLogs = useMemo(() => {
+    if (!userProfile) return [];
+    if (activeRole === 'teacher') {
+      return filterBehaviorLogsForReport({
+        logs: scopedLogs,
+        fromDate: reportFromDate,
+        toDate: reportToDate,
+        teacherOnlyId: userProfile.id,
+        classSectionId: reportClassId || undefined,
+        studentClassMap,
+      });
+    }
+    if (!reportClassId) return [];
+    return filterBehaviorLogsForReport({
+      logs: scopedLogs,
+      fromDate: reportFromDate,
+      toDate: reportToDate,
+      classSectionId: reportClassId,
+      studentClassMap,
+    });
+  }, [
+    userProfile,
+    activeRole,
+    scopedLogs,
+    reportFromDate,
+    reportToDate,
+    reportClassId,
+    studentClassMap,
+  ]);
+
+  const reportClassStudents = useMemo(() => {
+    if (!canSupervise || !reportClassId) return [];
+    return scope.students
+      .filter((s) => s.class_section_id === reportClassId)
+      .slice()
+      .sort((a, b) => getLocalizedName(a, lang).localeCompare(getLocalizedName(b, lang)));
+  }, [canSupervise, reportClassId, scope.students, lang]);
+
+  const reportClassStudentRows = useMemo(() => {
+    if (!canSupervise) return [];
+    const byStudent = new Map<string, BehaviorLog[]>();
+    for (const l of reportLogs) {
+      const arr = byStudent.get(l.student_id) || [];
+      arr.push(l);
+      byStudent.set(l.student_id, arr);
+    }
+    return reportClassStudents.map((st) => {
+      const stLogs = byStudent.get(st.id) || [];
+      const teacherCounts = new Map<string, number>();
+      for (const l of stLogs) {
+        const t = profMap.get(l.teacher_id);
+        const tName = t ? getLocalizedName(t, lang) : 'Staff';
+        teacherCounts.set(tName, (teacherCounts.get(tName) || 0) + 1);
+      }
+      return {
+        student: st,
+        logs: stLogs,
+        count: stLogs.length,
+        level: getBehaviorLevel(stLogs.length),
+        teacherSummary: [...teacherCounts.entries()].sort((a, b) => b[1] - a[1]),
+      };
+    });
+  }, [canSupervise, reportLogs, reportClassStudents, profMap, lang]);
 
   const selectedStudentBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
@@ -258,7 +363,7 @@ export const BehaviorModule: React.FC = () => {
   const handleExportPdf = async (student: Student) => {
     setExportingPdf(true);
     try {
-      const stLogs = logs.filter((l) => l.student_id === student.id);
+      const stLogs = scopedLogs.filter((l) => l.student_id === student.id);
       await exportBehaviorReportPdf({
         student,
         classSection: classMap.get(student.class_section_id),
@@ -270,6 +375,47 @@ export const BehaviorModule: React.FC = () => {
       });
     } finally {
       setExportingPdf(false);
+    }
+  };
+
+  const handleExportRangePdf = async () => {
+    if (!userProfile) return;
+    setExportingRangePdf(true);
+    try {
+      if (activeRole === 'teacher') {
+        const classLabel = reportClassId
+          ? classMap.get(reportClassId)?.display_name_en || 'Selected Class'
+          : 'All Assigned Classes';
+        await exportTeacherBehaviorRangePdf({
+          teacher: userProfile,
+          fromDate: reportFromDate,
+          toDate: reportToDate,
+          classFilterLabel: classLabel,
+          logs: reportLogs,
+          students,
+          classSections,
+          categories: behaviorCategories,
+          subjects,
+          settings: schoolSettings,
+        });
+      } else {
+        const targetClass = classMap.get(reportClassId);
+        if (!targetClass) return;
+        await exportClassBehaviorRangePdf({
+          classSection: targetClass,
+          fromDate: reportFromDate,
+          toDate: reportToDate,
+          generatedBy: userProfile,
+          classStudents: reportClassStudents,
+          logs: reportLogs,
+          categories: behaviorCategories,
+          subjects,
+          profiles,
+          settings: schoolSettings,
+        });
+      }
+    } finally {
+      setExportingRangePdf(false);
     }
   };
 
@@ -783,7 +929,7 @@ export const BehaviorModule: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.slice(0, 30).map((st) => {
-                const count = logs.filter((l) => l.student_id === st.id).length;
+                const count = scopedLogs.filter((l) => l.student_id === st.id).length;
                 const cs = classMap.get(st.class_section_id);
                 return (
                   <tr key={st.id} className="hover:bg-white/60 transition-colors">
@@ -830,6 +976,287 @@ export const BehaviorModule: React.FC = () => {
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* Date-Range Behavior Report & PDF Export */}
+      <section className="meis-card rounded-3xl p-5 sm:p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200/70">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">
+              {activeRole === 'teacher'
+                ? lang === 'ar'
+                  ? 'تقرير السلوك الخاص بي حسب الفترة وتصدير PDF'
+                  : 'My Recorded Behavior Report & PDF Export'
+                : lang === 'ar'
+                  ? 'تقرير سلوك الفصل الكامل حسب الفترة وتصدير PDF'
+                  : 'Class Behavior Date-Range Report & PDF Export'}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {activeRole === 'teacher'
+                ? lang === 'ar'
+                  ? 'يعرض فقط المخالفات التي قمت بتسجيلها شخصياً خلال الفترة المحددة.'
+                  : 'Displays and exports exclusively behavior incidents recorded by you within the selected date range.'
+                : lang === 'ar'
+                  ? 'تقرير شامل للفصل يوضح جميع المخالفات المسجلة لكل طالب من مختلف المعلمين مع تنسيق جاهز للطباعة.'
+                  : 'Generates a complete class report showing incidents recorded for each student across all teachers.'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            disabled={exportingRangePdf || (!canSupervise ? false : !reportClassId)}
+            onClick={() => void handleExportRangePdf()}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full meis-pill-dark text-xs sm:text-sm font-semibold cursor-pointer disabled:opacity-60 whitespace-nowrap shrink-0 shadow-sm"
+          >
+            <FileDown className="w-4 h-4" />
+            <span>
+              {exportingRangePdf
+                ? tr('loading', lang)
+                : lang === 'ar'
+                  ? 'تحميل تقرير PDF (إنجليزي)'
+                  : 'Download PDF Report'}
+            </span>
+          </button>
+        </div>
+
+        {/* Date Range + Class Filter Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label htmlFor="report-from-date" className="block text-xs font-semibold text-slate-700 mb-1.5">
+              {lang === 'ar' ? 'من تاريخ' : 'From Date'}
+            </label>
+            <div className="relative">
+              <Calendar className="w-4 h-4 text-slate-400 absolute top-3 start-3.5 pointer-events-none" />
+              <input
+                id="report-from-date"
+                type="date"
+                dir="ltr"
+                value={reportFromDate}
+                onChange={(e) => setReportFromDate(e.target.value)}
+                className="w-full ps-10 pe-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="report-to-date" className="block text-xs font-semibold text-slate-700 mb-1.5">
+              {lang === 'ar' ? 'إلى تاريخ' : 'To Date'}
+            </label>
+            <div className="relative">
+              <Calendar className="w-4 h-4 text-slate-400 absolute top-3 start-3.5 pointer-events-none" />
+              <input
+                id="report-to-date"
+                type="date"
+                dir="ltr"
+                value={reportToDate}
+                onChange={(e) => setReportToDate(e.target.value)}
+                className="w-full ps-10 pe-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="report-class-select" className="block text-xs font-semibold text-slate-700 mb-1.5">
+              {canSupervise
+                ? lang === 'ar'
+                  ? 'الفصل الدراسي (مطلوب لتقرير الفصل)'
+                  : 'Class Section (Entire Class)'
+                : lang === 'ar'
+                  ? 'تصفية حسب الفصل (اختياري)'
+                  : 'Filter by Class (Optional)'}
+            </label>
+            <select
+              id="report-class-select"
+              value={reportClassId}
+              onChange={(e) => setReportClassId(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+            >
+              {!canSupervise && (
+                <option value="">
+                  {lang === 'ar' ? 'جميع فصولي المسندة' : 'All My Classes'}
+                </option>
+              )}
+              {availableRecordClasses.map((cs) => (
+                <option key={cs.id} value={cs.id}>
+                  {getLocalizedDisplayName(cs, lang)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Report Preview Table */}
+        {activeRole === 'teacher' ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 px-1 tabular-nums">
+              <span>
+                {lang === 'ar' ? 'إجمالي السجلات التي قمت بتسجيلها:' : 'Incidents recorded by you:'}{' '}
+                <strong className="text-slate-900">{reportLogs.length}</strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {lang === 'ar' ? 'الفترة:' : 'Range:'}{' '}
+                <span dir="ltr" className="font-mono font-semibold text-slate-800">
+                  {reportFromDate} → {reportToDate}
+                </span>
+              </span>
+            </div>
+
+            <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-2xl border border-slate-200/70 bg-white/75">
+              <table className="w-full text-xs sm:text-sm">
+                <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/80 text-xs text-slate-600">
+                  <tr>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'التاريخ' : 'Date'}
+                    </th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'الطالب' : 'Student'}
+                    </th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'الفصل' : 'Class'}
+                    </th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'الحصة' : 'Period'}
+                    </th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'السلوك' : 'Behavior'}
+                    </th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'ملاحظات' : 'Notes'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {reportLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-xs text-slate-500">
+                        {lang === 'ar'
+                          ? 'لم تقم بتسجيل أي مخالفات سلوكية في هذه الفترة.'
+                          : 'You have not recorded any behavior incidents in this date range.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    reportLogs.map((l) => {
+                      const st = studentMap.get(l.student_id);
+                      const cs = classMap.get(l.class_section_id || st?.class_section_id || '');
+                      const cat = catMap.get(l.behavior_category_id);
+                      const dateStr = getRiyadhParts(new Date(l.created_at)).dateStr;
+                      return (
+                        <tr key={l.id} className="hover:bg-white/80">
+                          <td className="py-2.5 px-3 font-mono tabular-nums text-xs text-slate-600 whitespace-nowrap">
+                            {dateStr}
+                          </td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-900">
+                            {st ? getLocalizedName(st, lang) : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                            {getLocalizedDisplayName(cs, lang)}
+                          </td>
+                          <td className="py-2.5 px-3 tabular-nums text-slate-600">
+                            {l.period_number ? `P${l.period_number}` : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 font-semibold text-red-700">
+                            {cat ? getLocalizedName(cat, lang) : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600">{l.notes || '—'}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 px-1 tabular-nums">
+              <span>
+                {lang === 'ar' ? 'عدد طلاب الفصل:' : 'Class Students:'}{' '}
+                <strong className="text-slate-900">{reportClassStudentRows.length}</strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {lang === 'ar' ? 'إجمالي المخالفات في الفترة:' : 'Total Class Incidents:'}{' '}
+                <strong className="text-slate-900">{reportLogs.length}</strong>
+              </span>
+            </div>
+
+            <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-2xl border border-slate-200/70 bg-white/75">
+              <table className="w-full text-xs sm:text-sm">
+                <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/80 text-xs text-slate-600">
+                  <tr>
+                    <th className="py-2.5 px-3 text-start font-semibold">#</th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'اسم الطالب' : 'Student Name'}
+                    </th>
+                    <th className="py-2.5 px-3 text-center font-semibold">
+                      {lang === 'ar' ? 'العدد' : 'Count'}
+                    </th>
+                    <th className="py-2.5 px-3 text-center font-semibold">
+                      {lang === 'ar' ? 'المستوى' : 'Level'}
+                    </th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
+                      {lang === 'ar' ? 'سُجلت بواسطة (المعلمون)' : 'Recorded By (Teachers)'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {reportClassStudentRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-xs text-slate-500">
+                        {lang === 'ar'
+                          ? 'اختر فصلاً لعرض تقرير الطلاب.'
+                          : 'Select a class section to preview the class report.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    reportClassStudentRows.map((row, idx) => (
+                      <tr key={row.student.id} className="hover:bg-white/80">
+                        <td className="py-2.5 px-3 font-mono tabular-nums text-xs text-slate-500">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">
+                          {getLocalizedName(row.student, lang)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold tabular-nums text-slate-900">
+                          {row.count}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          {row.level === 'green' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                              {lang === 'ar' ? 'أخضر' : 'Green'}
+                            </span>
+                          )}
+                          {row.level === 'orange' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-bold">
+                              {lang === 'ar' ? 'برتقالي' : 'Orange'}
+                            </span>
+                          )}
+                          {row.level === 'red' && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold">
+                              {lang === 'ar' ? 'أحمر' : 'Red'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-xs text-slate-700">
+                          {row.teacherSummary.length === 0 ? (
+                            <span className="text-slate-400">
+                              {lang === 'ar' ? 'لا توجد مخالفات' : 'No incidents'}
+                            </span>
+                          ) : (
+                            row.teacherSummary
+                              .map(([tName, c]) => `${tName} (${c})`)
+                              .join(' · ')
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Student Comprehensive Behavior Profile Modal */}

@@ -5,8 +5,11 @@ import {
   buildWhatsAppUrl,
   checkTimetableConflict,
   computeBehaviorWatchlist,
+  filterBehaviorLogsForReport,
   filterTeachersInScope,
   getAvailableSubstitutes,
+  getBehaviorLevel,
+  getMonthlyClassBehaviorRows,
   getRoleScope,
   isAllowedSchoolEmail,
   isDateInRange,
@@ -15,7 +18,7 @@ import {
   parseStudentExcelRows,
   validateRoleConfiguration,
 } from './schoolRules';
-import { addDaysToDateStr, getSchoolWeekBounds } from './riyadhTime';
+import { addDaysToDateStr, getRecentMonths, getSchoolWeekBounds } from './riyadhTime';
 import type {
   BehaviorLog,
   ClassSection,
@@ -539,3 +542,84 @@ test('matchesBilingualSearch searches both Arabic and English names with Arabic 
   );
   assert.equal(matchesBilingualSearch('   ', 'Ahmed Ibrahim', 'أحمد إبراهيم'), true);
 });
+
+test('getBehaviorLevel maps 0 to green, 1..5 to orange, and >5 to red', () => {
+  assert.equal(getBehaviorLevel(0), 'green');
+  assert.equal(getBehaviorLevel(1), 'orange');
+  assert.equal(getBehaviorLevel(5), 'orange');
+  assert.equal(getBehaviorLevel(6), 'red');
+  assert.equal(getBehaviorLevel(12), 'red');
+});
+
+test('getMonthlyClassBehaviorRows aggregates class students for target month only', () => {
+  const students: Student[] = [
+    { id: 's1', iqama_id: '101', name_ar: 'طالب 1', name_en: 'Adam', father_mobile: '966500000001', grade_id: 'g4', section_id: 'sa', class_section_id: 'cs-4a' },
+    { id: 's2', iqama_id: '102', name_ar: 'طالب 2', name_en: 'Bilal', father_mobile: '966500000002', grade_id: 'g4', section_id: 'sa', class_section_id: 'cs-4a' },
+    { id: 's3', iqama_id: '103', name_ar: 'طالب 3', name_en: 'Other Class', father_mobile: '966500000003', grade_id: 'g4', section_id: 'sb', class_section_id: 'cs-4b' },
+  ];
+  const logs: BehaviorLog[] = [
+    { id: 'b1', student_id: 's1', teacher_id: 't1', class_section_id: 'cs-4a', subject_id: null, behavior_category_id: 'c1', period_number: 1, notes: null, created_at: '2026-11-10T09:00:00Z' },
+    { id: 'b2', student_id: 's1', teacher_id: 't2', class_section_id: 'cs-4a', subject_id: null, behavior_category_id: 'c2', period_number: 2, notes: null, created_at: '2026-11-12T10:00:00Z' },
+    { id: 'b3', student_id: 's1', teacher_id: 't1', class_section_id: 'cs-4a', subject_id: null, behavior_category_id: 'c1', period_number: 3, notes: null, created_at: '2026-10-20T10:00:00Z' },
+  ];
+
+  const novRows = getMonthlyClassBehaviorRows({
+    students,
+    logs,
+    classSectionId: 'cs-4a',
+    monthStr: '2026-11',
+    lang: 'en',
+  });
+  assert.equal(novRows.length, 2);
+  assert.equal(novRows[0].student.id, 's1');
+  assert.equal(novRows[0].count, 2);
+  assert.equal(novRows[0].level, 'orange');
+  assert.equal(novRows[1].student.id, 's2');
+  assert.equal(novRows[1].count, 0);
+  assert.equal(novRows[1].level, 'green');
+
+  const octRows = getMonthlyClassBehaviorRows({
+    students,
+    logs,
+    classSectionId: 'cs-4a',
+    monthStr: '2026-10',
+    lang: 'en',
+  });
+  assert.equal(octRows[0].count, 1);
+  assert.equal(octRows[0].level, 'orange');
+});
+
+test('filterBehaviorLogsForReport isolates teacher-only logs and date ranges', () => {
+  const logs: BehaviorLog[] = [
+    { id: 'b1', student_id: 's1', teacher_id: 't1', class_section_id: 'cs-4a', subject_id: null, behavior_category_id: 'c1', period_number: 1, notes: null, created_at: '2026-11-05T08:00:00Z' },
+    { id: 'b2', student_id: 's1', teacher_id: 't2', class_section_id: 'cs-4a', subject_id: null, behavior_category_id: 'c1', period_number: 2, notes: null, created_at: '2026-11-10T08:00:00Z' },
+    { id: 'b3', student_id: 's2', teacher_id: 't1', class_section_id: 'cs-4b', subject_id: null, behavior_category_id: 'c2', period_number: 3, notes: null, created_at: '2026-11-15T08:00:00Z' },
+  ];
+
+  const t1Logs = filterBehaviorLogsForReport({
+    logs,
+    fromDate: '2026-11-01',
+    toDate: '2026-11-12',
+    teacherOnlyId: 't1',
+  });
+  assert.deepEqual(t1Logs.map((l) => l.id), ['b1']);
+
+  const classLogsAllTeachers = filterBehaviorLogsForReport({
+    logs,
+    fromDate: '2026-11-01',
+    toDate: '2026-11-30',
+    classSectionId: 'cs-4a',
+  });
+  assert.deepEqual(classLogsAllTeachers.map((l) => l.id), ['b2', 'b1']);
+});
+
+test('getRecentMonths returns current month first followed by previous months', () => {
+  const months = getRecentMonths(new Date('2026-11-17T10:00:00Z'), 3);
+  assert.equal(months.length, 3);
+  assert.equal(months[0].monthStr, '2026-11');
+  assert.equal(months[0].isCurrent, true);
+  assert.equal(months[1].monthStr, '2026-10');
+  assert.equal(months[1].isCurrent, false);
+  assert.equal(months[2].monthStr, '2026-09');
+});
+

@@ -136,14 +136,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
   const profMap = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
 
   const scopedBehaviorLogs = useMemo(() => {
-    if (scope.isUnrestricted) return behaviorLogs;
     if (activeRole === 'teacher') {
-      return behaviorLogs.filter(
-        (b) =>
-          scope.classSectionIds.has(b.class_section_id) ||
-          (scope.classSectionIds.size === 0 && b.teacher_id === userProfile.id)
-      );
+      return behaviorLogs.filter((b) => b.teacher_id === userProfile.id);
     }
+    if (scope.isUnrestricted) return behaviorLogs;
     return behaviorLogs.filter((b) => scope.classSectionIds.has(b.class_section_id));
   }, [behaviorLogs, scope, activeRole, userProfile.id]);
 

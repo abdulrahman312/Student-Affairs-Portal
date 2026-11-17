@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { ClassroomHomeScreen } from './components/ClassroomHomeScreen';
 import { AuthScreen } from './components/AuthScreen';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { LayoutShell, type NavTab } from './components/LayoutShell';
@@ -12,8 +13,15 @@ import { NoticeBoardManager } from './components/NoticeBoardSection';
 import { AdminSuite } from './components/AdminSuite';
 
 const PortalRouter: React.FC = () => {
-  const { authLoading, masterLoading, userProfile, lang } = useApp();
+  const { authLoading, masterLoading, authError, userProfile, lang } = useApp();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [showAuthScreen, setShowAuthScreen] = useState(false);
+
+  useEffect(() => {
+    if (userProfile) {
+      setShowAuthScreen(false);
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     if (!userProfile) return;
@@ -31,7 +39,7 @@ const PortalRouter: React.FC = () => {
     }
   }, [userProfile, activeTab]);
 
-  if (authLoading || (masterLoading && (!userProfile || !userProfile.is_onboarded))) {
+  if (authLoading || (userProfile && !userProfile.is_onboarded && masterLoading)) {
     return (
       <div className="min-h-screen meis-mesh-bg flex items-center justify-center p-6">
         <div className="meis-card rounded-3xl px-9 py-7 text-center">
@@ -47,7 +55,10 @@ const PortalRouter: React.FC = () => {
   }
 
   if (!userProfile) {
-    return <AuthScreen />;
+    if (showAuthScreen || authError) {
+      return <AuthScreen onBack={() => setShowAuthScreen(false)} />;
+    }
+    return <ClassroomHomeScreen onOpenAuth={() => setShowAuthScreen(true)} />;
   }
 
   if (!userProfile.is_onboarded) {

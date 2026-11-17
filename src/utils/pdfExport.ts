@@ -16,6 +16,7 @@ import type {
 } from '../types/database';
 import { DAY_NAMES } from './i18n';
 import { getIsoWeekdayFromDateStr, getRiyadhParts } from './riyadhTime';
+import { getBehaviorLevel } from './schoolRules';
 
 const MEIS_CREST_PATH = '/src/assets/images/meis_school_crest_1794849576691.jpg';
 
@@ -629,4 +630,487 @@ export async function exportDailyAbsencesPdf(params: {
 
   doc.save(`MEIS_Daily_Absences_Substitutions_${targetDate}.pdf`);
 }
+
+export async function exportTeacherBehaviorRangePdf(params: {
+  teacher: Profile;
+  fromDate: string;
+  toDate: string;
+  classFilterLabel?: string;
+  logs: BehaviorLog[];
+  students: Student[];
+  classSections: ClassSection[];
+  categories: BehaviorCategory[];
+  subjects: Subject[];
+  settings: SchoolSettings | null;
+}): Promise<void> {
+  const {
+    teacher,
+    fromDate,
+    toDate,
+    classFilterLabel,
+    logs,
+    students,
+    classSections,
+    categories,
+    subjects,
+    settings,
+  } = params;
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const studentMap = new Map(students.map((s) => [s.id, s]));
+  const classMap = new Map(classSections.map((c) => [c.id, c]));
+  const catMap = new Map(categories.map((c) => [c.id, c]));
+  const subMap = new Map(subjects.map((s) => [s.id, s]));
+
+  let y = await drawMeisHeader(
+    doc,
+    'Teacher Behavior Log Report',
+    `Range: ${fromDate} to ${toDate}`,
+    settings
+  );
+
+  // Teacher Metadata Box
+  doc.setFillColor(...COLORS.cardBg);
+  doc.setDrawColor(...COLORS.cardBorder);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(14, y, pageWidth - 28, 22, 3, 3, 'FD');
+
+  doc.setFillColor(...COLORS.royalBlue);
+  doc.rect(14, y + 2, 2, 18, 'F');
+
+  doc.setTextColor(...COLORS.royalNavy);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11.5);
+  doc.text(teacher.name_en || teacher.email, 20, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...COLORS.mutedText);
+  const subjectName = teacher.primary_subject_id
+    ? subMap.get(teacher.primary_subject_id)?.name_en || '-'
+    : 'All Subjects';
+  doc.text(`Subject: ${subjectName}  |  Scope: ${classFilterLabel || 'All Assigned Classes'}`, 20, y + 14);
+  doc.text(`Recorded Exclusively By: ${teacher.name_en || teacher.email}`, 20, y + 19.2);
+  doc.text(`From ${fromDate} to ${toDate}`, pageWidth - 18, y + 14, { align: 'right' });
+
+  y += 28;
+
+  // Summary Cards
+  const uniqueStudents = new Set(logs.map((l) => l.student_id)).size;
+  const catFreq = new Map<string, number>();
+  for (const l of logs) {
+    const label = catMap.get(l.behavior_category_id)?.name_en || 'Other';
+    catFreq.set(label, (catFreq.get(label) || 0) + 1);
+  }
+  const topCat = [...catFreq.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || 'None';
+
+  const cardWidth = (pageWidth - 36) / 3;
+  const summaryCards = [
+    {
+      label: 'TOTAL RECORDED',
+      value: String(logs.length),
+      bg: [239, 246, 255],
+      border: [191, 219, 254],
+      fg: [29, 78, 216],
+    },
+    {
+      label: 'STUDENTS INVOLVED',
+      value: String(uniqueStudents),
+      bg: [236, 253, 245],
+      border: [167, 243, 208],
+      fg: [4, 120, 87],
+    },
+    {
+      label: 'MOST FREQUENT TYPE',
+      value: topCat.slice(0, 24),
+      bg: [255, 247, 237],
+      border: [254, 215, 170],
+      fg: [194, 65, 12],
+    },
+  ];
+
+  summaryCards.forEach((b, idx) => {
+    const bx = 14 + idx * (cardWidth + 4);
+    doc.setFillColor(b.bg[0], b.bg[1], b.bg[2]);
+    doc.setDrawColor(b.border[0], b.border[1], b.border[2]);
+    doc.roundedRect(bx, y, cardWidth, 16, 2.5, 2.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(b.fg[0], b.fg[1], b.fg[2]);
+    doc.text(b.label, bx + 4, y + 5.5);
+    doc.setFontSize(10.5);
+    doc.text(b.value, bx + 4, y + 12.5);
+  });
+
+  y += 22;
+
+  const sortedLogs = [...logs].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const rows = sortedLogs.map((log, idx) => {
+    const dt = new Date(log.created_at);
+    const riyadhDate = getRiyadhParts(dt).dateStr;
+    const riyadhTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Riyadh',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(dt);
+    const st = studentMap.get(log.student_id);
+    const cs = classMap.get(log.class_section_id || st?.class_section_id || '');
+    return [
+      String(idx + 1),
+      riyadhDate,
+      riyadhTime,
+      cs?.display_name_en || '-',
+      st?.name_en || '-',
+      log.period_number ? `P${log.period_number}` : '-',
+      catMap.get(log.behavior_category_id)?.name_en || '-',
+      log.notes || '-',
+    ];
+  });
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Date', 'Time', 'Class', 'Student Name', 'Per.', 'Behavior Category', 'Notes']],
+    body: rows.length
+      ? rows
+      : [['-', '-', '-', '-', 'No behavior incidents recorded in this date range', '-', '-', '-']],
+    theme: 'grid',
+    headStyles: {
+      fillColor: COLORS.tableHeadBg,
+      textColor: COLORS.royalNavy,
+      lineColor: COLORS.tableHeadBorder,
+      lineWidth: 0.35,
+      fontStyle: 'bold',
+      fontSize: 8.5,
+    },
+    styles: {
+      lineColor: COLORS.cardBorder,
+      lineWidth: 0.25,
+    },
+    bodyStyles: {
+      fontSize: 8,
+      textColor: COLORS.bodyText,
+      cellPadding: 2.5,
+    },
+    alternateRowStyles: {
+      fillColor: COLORS.zebraBg,
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 17 },
+      3: { cellWidth: 23 },
+      4: { cellWidth: 34, fontStyle: 'bold' },
+      5: { cellWidth: 10, halign: 'center' },
+      6: { cellWidth: 36 },
+      7: { cellWidth: 'auto' },
+    },
+    margin: { left: 14, right: 14, bottom: 18 },
+  });
+
+  drawFooter(doc, settings);
+
+  const safeName = (teacher.name_en || 'Teacher').replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`MEIS_Teacher_Behavior_${safeName}_${fromDate}_to_${toDate}.pdf`);
+}
+
+export async function exportClassBehaviorRangePdf(params: {
+  classSection: ClassSection;
+  fromDate: string;
+  toDate: string;
+  generatedBy: Profile;
+  classStudents: Student[];
+  logs: BehaviorLog[];
+  categories: BehaviorCategory[];
+  subjects: Subject[];
+  profiles: Profile[];
+  settings: SchoolSettings | null;
+}): Promise<void> {
+  const {
+    classSection,
+    fromDate,
+    toDate,
+    generatedBy,
+    classStudents,
+    logs,
+    categories,
+    subjects,
+    profiles,
+    settings,
+  } = params;
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const studentMap = new Map(classStudents.map((s) => [s.id, s]));
+  const catMap = new Map(categories.map((c) => [c.id, c]));
+  const subMap = new Map(subjects.map((s) => [s.id, s]));
+  const profMap = new Map(profiles.map((p) => [p.id, p]));
+
+  let y = await drawMeisHeader(
+    doc,
+    'Class Behavior Report',
+    `${classSection.display_name_en} | ${fromDate} to ${toDate}`,
+    settings
+  );
+
+  // Class Info Card
+  doc.setFillColor(...COLORS.cardBg);
+  doc.setDrawColor(...COLORS.cardBorder);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(14, y, pageWidth - 28, 22, 3, 3, 'FD');
+
+  doc.setFillColor(...COLORS.emeraldMid);
+  doc.rect(14, y + 2, 2, 18, 'F');
+
+  doc.setTextColor(...COLORS.royalNavy);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(`Class: ${classSection.display_name_en}`, 20, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...COLORS.mutedText);
+  doc.text(`Date Range: ${fromDate} to ${toDate}  |  Students in Class: ${classStudents.length}`, 20, y + 14);
+  doc.text(`Prepared By: ${generatedBy.name_en || generatedBy.email}`, 20, y + 19.2);
+
+  y += 28;
+
+  // Build Student-by-Student Breakdown across different teachers
+  const logsByStudent = new Map<string, BehaviorLog[]>();
+  for (const log of logs) {
+    const arr = logsByStudent.get(log.student_id) || [];
+    arr.push(log);
+    logsByStudent.set(log.student_id, arr);
+  }
+
+  let redCount = 0;
+  let orangeCount = 0;
+  let greenCount = 0;
+
+  const sortedStudents = [...classStudents].sort((a, b) =>
+    (a.name_en || a.name_ar).localeCompare(b.name_en || b.name_ar)
+  );
+
+  const studentSummaryRows = sortedStudents.map((st, idx) => {
+    const stLogs = logsByStudent.get(st.id) || [];
+    const count = stLogs.length;
+    const level = getBehaviorLevel(count);
+    if (level === 'red') redCount += 1;
+    else if (level === 'orange') orangeCount += 1;
+    else greenCount += 1;
+
+    const teacherCounts = new Map<string, number>();
+    for (const l of stLogs) {
+      const tName = profMap.get(l.teacher_id)?.name_en || 'Staff';
+      teacherCounts.set(tName, (teacherCounts.get(tName) || 0) + 1);
+    }
+    const teacherSummary =
+      teacherCounts.size > 0
+        ? [...teacherCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([tName, c]) => `${tName} (${c})`)
+            .join(', ')
+        : 'No incidents';
+
+    const levelLabel =
+      level === 'green' ? 'Green (Clear)' : level === 'orange' ? 'Orange (1-5)' : 'Red (>5)';
+
+    return {
+      level,
+      cells: [
+        String(idx + 1),
+        st.iqama_id,
+        st.name_en || st.name_ar,
+        String(count),
+        levelLabel,
+        teacherSummary,
+      ],
+    };
+  });
+
+  // Summary KPI Cards
+  const cardWidth = (pageWidth - 36) / 3;
+  const cards = [
+    {
+      label: 'TOTAL CLASS INCIDENTS',
+      value: String(logs.length),
+      bg: [239, 246, 255],
+      border: [191, 219, 254],
+      fg: [29, 78, 216],
+    },
+    {
+      label: 'CLEAR (0) / ATTENTION (1-5)',
+      value: `${greenCount} Green / ${orangeCount} Orange`,
+      bg: [236, 253, 245],
+      border: [167, 243, 208],
+      fg: [4, 120, 87],
+    },
+    {
+      label: 'CRITICAL LEVEL (>5)',
+      value: `${redCount} Students`,
+      bg: redCount > 0 ? [254, 242, 242] : [248, 250, 252],
+      border: redCount > 0 ? [254, 202, 202] : [203, 213, 225],
+      fg: redCount > 0 ? [185, 28, 28] : [71, 85, 105],
+    },
+  ];
+
+  cards.forEach((b, idx) => {
+    const bx = 14 + idx * (cardWidth + 4);
+    doc.setFillColor(b.bg[0], b.bg[1], b.bg[2]);
+    doc.setDrawColor(b.border[0], b.border[1], b.border[2]);
+    doc.roundedRect(bx, y, cardWidth, 16, 2.5, 2.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.2);
+    doc.setTextColor(b.fg[0], b.fg[1], b.fg[2]);
+    doc.text(b.label, bx + 4, y + 5.5);
+    doc.setFontSize(10);
+    doc.text(b.value, bx + 4, y + 12.5);
+  });
+
+  y += 22;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.royalNavy);
+  doc.text('1. Student Summary & Recording Teachers', 14, y);
+  y += 3;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'ID / Iqama', 'Student Name', 'Count', 'Level', 'Recorded By (Teachers)']],
+    body: studentSummaryRows.length
+      ? studentSummaryRows.map((r) => r.cells)
+      : [['-', '-', 'No students found in this class', '0', '-', '-']],
+    theme: 'grid',
+    headStyles: {
+      fillColor: COLORS.tableHeadBg,
+      textColor: COLORS.royalNavy,
+      lineColor: COLORS.tableHeadBorder,
+      lineWidth: 0.35,
+      fontStyle: 'bold',
+      fontSize: 8.2,
+    },
+    styles: {
+      lineColor: COLORS.cardBorder,
+      lineWidth: 0.25,
+    },
+    bodyStyles: {
+      fontSize: 8,
+      textColor: COLORS.bodyText,
+      cellPadding: 2.5,
+      valign: 'middle',
+    },
+    alternateRowStyles: {
+      fillColor: COLORS.zebraBg,
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 23 },
+      2: { cellWidth: 42, fontStyle: 'bold' },
+      3: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+      4: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+      5: { cellWidth: 'auto' },
+    },
+    didParseCell: (hookData) => {
+      if (hookData.section === 'body' && hookData.column.index === 4) {
+        const meta = studentSummaryRows[hookData.row.index];
+        if (meta?.level === 'green') {
+          hookData.cell.styles.textColor = COLORS.emeraldDark;
+        } else if (meta?.level === 'orange') {
+          hookData.cell.styles.textColor = [194, 65, 12];
+        } else if (meta?.level === 'red') {
+          hookData.cell.styles.textColor = [185, 28, 28];
+        }
+      }
+    },
+    margin: { left: 14, right: 14, bottom: 18 },
+  });
+
+  // Section 2: Detailed Incident Log across Teachers
+  const finalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 20;
+  let nextY = finalY + 9;
+  if (nextY > doc.internal.pageSize.getHeight() - 45) {
+    doc.addPage();
+    nextY = 20;
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.royalNavy);
+  doc.text('2. Detailed Chronological Behavior Log', 14, nextY);
+
+  const sortedLogs = [...logs].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const detailRows = sortedLogs.map((log, idx) => {
+    const dt = new Date(log.created_at);
+    const riyadhDate = getRiyadhParts(dt).dateStr;
+    const riyadhTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Riyadh',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(dt);
+    const st = studentMap.get(log.student_id);
+    return [
+      String(idx + 1),
+      riyadhDate,
+      riyadhTime,
+      st?.name_en || '-',
+      log.period_number ? `P${log.period_number}` : '-',
+      catMap.get(log.behavior_category_id)?.name_en || '-',
+      profMap.get(log.teacher_id)?.name_en || '-',
+      log.subject_id ? subMap.get(log.subject_id)?.name_en || '-' : '-',
+      log.notes || '-',
+    ];
+  });
+
+  autoTable(doc, {
+    startY: nextY + 3,
+    head: [['#', 'Date', 'Time', 'Student Name', 'Per.', 'Behavior Category', 'Recorded By', 'Subject', 'Notes']],
+    body: detailRows.length
+      ? detailRows
+      : [['-', '-', '-', 'No behavior incidents recorded in this date range', '-', '-', '-', '-', '-']],
+    theme: 'grid',
+    headStyles: {
+      fillColor: COLORS.tableHeadBg,
+      textColor: COLORS.royalNavy,
+      lineColor: COLORS.tableHeadBorder,
+      lineWidth: 0.35,
+      fontStyle: 'bold',
+      fontSize: 8,
+    },
+    styles: {
+      lineColor: COLORS.cardBorder,
+      lineWidth: 0.25,
+    },
+    bodyStyles: {
+      fontSize: 7.5,
+      textColor: COLORS.bodyText,
+      cellPadding: 2.2,
+    },
+    alternateRowStyles: {
+      fillColor: COLORS.zebraBg,
+    },
+    columnStyles: {
+      0: { cellWidth: 7, halign: 'center' },
+      1: { cellWidth: 19 },
+      2: { cellWidth: 16 },
+      3: { cellWidth: 32, fontStyle: 'bold' },
+      4: { cellWidth: 9, halign: 'center' },
+      5: { cellWidth: 30 },
+      6: { cellWidth: 26 },
+      7: { cellWidth: 20 },
+      8: { cellWidth: 'auto' },
+    },
+    margin: { left: 14, right: 14, bottom: 18 },
+  });
+
+  drawFooter(doc, settings);
+
+  const safeClass = classSection.display_name_en.replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`MEIS_Class_Behavior_${safeClass}_${fromDate}_to_${toDate}.pdf`);
+}
+
 
