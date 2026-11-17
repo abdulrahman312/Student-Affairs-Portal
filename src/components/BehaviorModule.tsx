@@ -286,7 +286,7 @@ export const BehaviorModule: React.FC = () => {
       {/* Header Row */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-slate-900">
             {lang === 'ar' ? 'إدارة السلوك الطلابي' : 'Student Behavior & Watchlist'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -302,7 +302,7 @@ export const BehaviorModule: React.FC = () => {
             setShowRecordForm((v) => !v);
             setFormMsg(null);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold cursor-pointer whitespace-nowrap"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full meis-pill-dark text-sm font-semibold cursor-pointer whitespace-nowrap shrink-0 shadow-sm"
         >
           <Plus className="w-4 h-4" />
           <span>{lang === 'ar' ? 'تسجيل مخالفة سلوكية' : 'Record Behavior Incident'}</span>
@@ -311,13 +311,13 @@ export const BehaviorModule: React.FC = () => {
 
       {/* Record Behavior Form */}
       {showRecordForm && (
-        <section className="meis-glass rounded-2xl p-5 sm:p-6">
+        <section className="meis-card rounded-3xl p-5 sm:p-6">
           <div className="flex items-center justify-between gap-4 mb-4">
             <h2 className="text-base font-bold text-slate-900">
               {lang === 'ar' ? 'تسجيل ملاحظة سلوكية جديدة' : 'New Behavior Incident Entry'}
             </h2>
             {!scope.isUnrestricted && availableRecordClasses.length === 0 && (
-              <span className="text-xs font-semibold text-amber-700">
+              <span className="text-xs font-semibold text-amber-700 px-3 py-1 rounded-full bg-amber-50 border border-amber-200">
                 {lang === 'ar'
                   ? 'لا توجد فصول معينة لحسابك بعد — تواصل مع مدير النظام.'
                   : 'No class sections assigned to your account yet.'}
@@ -327,7 +327,7 @@ export const BehaviorModule: React.FC = () => {
 
           <form onSubmit={handleRecordSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'الفصل الدراسي' : 'Class Section'}
               </label>
               <select
@@ -336,7 +336,7 @@ export const BehaviorModule: React.FC = () => {
                   setRecordClassId(e.target.value);
                   setRecordStudentId('');
                 }}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="">{lang === 'ar' ? 'كل الفصول المسندة' : 'All Assigned Classes'}</option>
                 {availableRecordClasses.map((cs) => (
@@ -348,12 +348,12 @@ export const BehaviorModule: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'بحث واختيار الطالب (عربي / إنجليزي)' : 'Search & Select Student (EN/AR)'}
               </label>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3.5" />
                   <input
                     type="text"
                     value={recordStudentSearch}
@@ -364,7 +364,7 @@ export const BehaviorModule: React.FC = () => {
                     placeholder={
                       lang === 'ar' ? 'ابحث باسم الطالب أو الإقامة...' : 'Search student EN / AR / ID...'
                     }
-                    className="w-full ps-8 pe-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs"
+                    className="w-full ps-9 pe-3.5 py-2 rounded-full border border-slate-200/80 bg-white/90 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                   />
                 </div>
                 <select
@@ -376,7 +376,7 @@ export const BehaviorModule: React.FC = () => {
                     const st = studentMap.get(stId);
                     if (st && !recordClassId) setRecordClassId(st.class_section_id);
                   }}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 >
                   <option value="">
                     {lang === 'ar' ? '-- اختر الطالب --' : '-- Select Student --'}
@@ -391,14 +391,14 @@ export const BehaviorModule: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'نوع السلوك' : 'Behavior Category'}
               </label>
               <select
                 required
                 value={recordCategoryId}
                 onChange={(e) => setRecordCategoryId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="">
                   {lang === 'ar' ? '-- اختر السلوك --' : '-- Select Behavior --'}
@@ -412,13 +412,13 @@ export const BehaviorModule: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'رقم الحصة (اختياري)' : 'Period Number (Optional)'}
               </label>
               <select
                 value={recordPeriod}
                 onChange={(e) => setRecordPeriod(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="">{lang === 'ar' ? 'غير محدد' : 'Not specified'}</option>
                 {[1, 2, 3, 4, 5, 6, 7].map((p) => (
@@ -430,7 +430,7 @@ export const BehaviorModule: React.FC = () => {
             </div>
 
             <div className="sm:col-span-2 lg:col-span-3">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'ملاحظات إضافية (اختياري)' : 'Notes (Optional)'}
               </label>
               <input
@@ -438,7 +438,7 @@ export const BehaviorModule: React.FC = () => {
                 value={recordNotes}
                 onChange={(e) => setRecordNotes(e.target.value)}
                 placeholder={lang === 'ar' ? 'تفاصيل مختصرة...' : 'Brief incident context...'}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
@@ -446,7 +446,7 @@ export const BehaviorModule: React.FC = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-60"
+                className="w-full py-2.5 px-5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-60 whitespace-nowrap shadow-sm"
               >
                 {submitting ? tr('loading', lang) : tr('submit', lang)}
               </button>
@@ -455,7 +455,7 @@ export const BehaviorModule: React.FC = () => {
 
           {formMsg && (
             <div
-              className={`mt-4 p-3 rounded-xl text-xs font-semibold border ${
+              className={`mt-4 px-4 py-3 rounded-2xl text-xs font-semibold border ${
                 formMsg.type === 'ok'
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                   : 'bg-red-50 border-red-200 text-red-700'
@@ -471,8 +471,8 @@ export const BehaviorModule: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Watchlist Leaderboard */}
         {canSupervise && (
-          <section className="lg:col-span-5 meis-glass rounded-2xl p-5 flex flex-col">
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/80">
+          <section className="lg:col-span-5 meis-card rounded-3xl p-5 sm:p-6 flex flex-col">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200/70">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
                   {lang === 'ar' ? 'قائمة المتابعة السلوكية' : 'High Negative Behavior Watchlist'}
@@ -483,15 +483,15 @@ export const BehaviorModule: React.FC = () => {
                     : `Alert threshold: ${threshold}+ incidents`}
                 </p>
               </div>
-              <div className="inline-flex p-1 bg-slate-100 rounded-xl">
+              <div className="inline-flex p-1 bg-white/80 border border-slate-200/70 rounded-full gap-0.5">
                 {(['today', 'week', 'month', 'all'] as WatchlistTimeframe[]).map((tf) => (
                   <button
                     key={tf}
                     type="button"
                     onClick={() => setTimeframe(tf)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                    className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
                       timeframe === tf
-                        ? 'bg-white text-slate-900 shadow-xs'
+                        ? 'meis-pill-dark shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -519,10 +519,10 @@ export const BehaviorModule: React.FC = () => {
                   return (
                     <div
                       key={entry.student.id}
-                      className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-colors ${
                         entry.exceedsThreshold
-                          ? 'bg-red-50/70 border-red-200'
-                          : 'bg-white border-slate-200/80'
+                          ? 'bg-red-50/80 border-red-200/90'
+                          : 'bg-white/85 border-slate-200/70'
                       }`}
                     >
                       <button
@@ -541,7 +541,7 @@ export const BehaviorModule: React.FC = () => {
 
                       <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold tabular-nums ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold tabular-nums ${
                             entry.exceedsThreshold
                               ? 'bg-red-600 text-white'
                               : 'bg-slate-100 text-slate-800'
@@ -558,7 +558,7 @@ export const BehaviorModule: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`WhatsApp parent of ${entry.student.name_en}`}
-                          className="p-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+                          className="p-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                         </a>
@@ -573,9 +573,9 @@ export const BehaviorModule: React.FC = () => {
 
         {/* Today's Live Behavior Feed */}
         <section
-          className={`${canSupervise ? 'lg:col-span-7' : 'lg:col-span-12'} meis-glass rounded-2xl p-5`}
+          className={`${canSupervise ? 'lg:col-span-7' : 'lg:col-span-12'} meis-card rounded-3xl p-5 sm:p-6`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/70">
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {lang === 'ar' ? 'سجل مخالفات اليوم' : "Today's Behavior Feed"}
@@ -586,7 +586,7 @@ export const BehaviorModule: React.FC = () => {
               </p>
             </div>
             <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3.5" />
               <input
                 type="text"
                 value={feedSearchQuery}
@@ -594,7 +594,7 @@ export const BehaviorModule: React.FC = () => {
                 placeholder={
                   lang === 'ar' ? 'بحث بالطالب أو المعلم...' : 'Search student or teacher (EN/AR)...'
                 }
-                className="w-full ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+                className="w-full ps-9 pe-3.5 py-2 rounded-full border border-slate-200/80 bg-white/90 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
           </div>
@@ -625,7 +625,7 @@ export const BehaviorModule: React.FC = () => {
                 return (
                   <div
                     key={log.id}
-                    className="p-3.5 rounded-xl bg-white border border-slate-200/80 flex flex-wrap items-center justify-between gap-3"
+                    className="p-3.5 rounded-2xl bg-white/85 border border-slate-200/70 flex flex-wrap items-center justify-between gap-3"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1">
@@ -635,7 +635,7 @@ export const BehaviorModule: React.FC = () => {
                         {log.period_number && (
                           <>
                             <span aria-hidden="true">·</span>
-                            <span>
+                            <span className="px-2 py-0.5 rounded-full meis-accent-pill text-[11px] font-semibold">
                               {lang === 'ar' ? `حصة ${log.period_number}` : `P${log.period_number}`}
                             </span>
                           </>
@@ -675,7 +675,7 @@ export const BehaviorModule: React.FC = () => {
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold whitespace-nowrap"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold whitespace-nowrap"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                           <span>{tr('whatsappFather', lang)}</span>
@@ -686,7 +686,7 @@ export const BehaviorModule: React.FC = () => {
                           type="button"
                           aria-label="Delete behavior incident"
                           onClick={() => void handleDeleteLog(log.id)}
-                          className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                          className="p-2 rounded-full border border-slate-200/80 bg-white text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -701,8 +701,8 @@ export const BehaviorModule: React.FC = () => {
       </div>
 
       {/* Student Search & Full Behavior Directory */}
-      <section className="meis-glass rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+      <section className="meis-card rounded-3xl p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200/70">
           <div>
             <h2 className="text-base font-bold text-slate-900">
               {lang === 'ar' ? 'بحث وملفات سلوك الطلاب' : 'Student Search & Behavior Profiles'}
@@ -717,7 +717,7 @@ export const BehaviorModule: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 my-4">
           <div className="sm:col-span-2 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute top-3 start-3.5" />
+            <Search className="w-4 h-4 text-slate-400 absolute top-3 start-4" />
             <input
               type="text"
               value={searchQuery}
@@ -727,7 +727,7 @@ export const BehaviorModule: React.FC = () => {
                   ? 'ابحث برقم الإقامة أو الاسم العربي أو الإنجليزي...'
                   : 'Search by ID/Iqama, Arabic name, or English name...'
               }
-              className="w-full ps-10 pe-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+              className="w-full ps-10 pe-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
             />
           </div>
 
@@ -735,7 +735,7 @@ export const BehaviorModule: React.FC = () => {
             aria-label={lang === 'ar' ? 'تصفية حسب الصف' : 'Filter by Grade'}
             value={scope.gradeIds.has(filterGradeId) ? filterGradeId : ''}
             onChange={(e) => setFilterGradeId(e.target.value)}
-            className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+            className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
           >
             <option value="">{lang === 'ar' ? 'جميع الصفوف' : 'All Assigned Grades'}</option>
             {scope.grades.map((g) => (
@@ -749,7 +749,7 @@ export const BehaviorModule: React.FC = () => {
             aria-label={lang === 'ar' ? 'تصفية حسب الشعبة' : 'Filter by Section'}
             value={scope.sectionIds.has(filterSectionId) ? filterSectionId : ''}
             onChange={(e) => setFilterSectionId(e.target.value)}
-            className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+            className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
           >
             <option value="">{lang === 'ar' ? 'جميع الشعب' : 'All Assigned Sections'}</option>
             {scope.sections.map((s) => (
@@ -763,7 +763,7 @@ export const BehaviorModule: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs text-slate-500">
+              <tr className="border-b border-slate-200/80 text-xs text-slate-500">
                 <th className="py-2.5 px-3 text-start font-semibold">
                   {lang === 'ar' ? 'رقم الإقامة / الهوية' : 'ID / Iqama'}
                 </th>
@@ -786,26 +786,32 @@ export const BehaviorModule: React.FC = () => {
                 const count = logs.filter((l) => l.student_id === st.id).length;
                 const cs = classMap.get(st.class_section_id);
                 return (
-                  <tr key={st.id} className="hover:bg-slate-50/70">
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-xs text-slate-600">
+                  <tr key={st.id} className="hover:bg-white/60 transition-colors">
+                    <td className="py-3 px-3 font-mono tabular-nums text-xs text-slate-600">
                       {st.iqama_id}
                     </td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">
+                    <td className="py-3 px-3 font-semibold text-slate-900">
                       {getLocalizedName(st, lang)}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600">
+                    <td className="py-3 px-3 text-slate-600">
                       {getLocalizedDisplayName(cs, lang)}
                     </td>
-                    <td className="py-2.5 px-3 text-end tabular-nums font-bold">
-                      <span className={count >= threshold ? 'text-red-600' : 'text-slate-700'}>
+                    <td className="py-3 px-3 text-end tabular-nums font-bold">
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-full text-xs ${
+                          count >= threshold
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
                         {count}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-end">
+                    <td className="py-3 px-3 text-end">
                       <button
                         type="button"
                         onClick={() => setSelectedStudent(st)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer whitespace-nowrap"
                       >
                         <User className="w-3.5 h-3.5" />
                         <span>{lang === 'ar' ? 'الملف السلوكي' : 'View Profile'}</span>
@@ -828,9 +834,9 @@ export const BehaviorModule: React.FC = () => {
 
       {/* Student Comprehensive Behavior Profile Modal */}
       {selectedStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-4xl w-full p-6 sm:p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-slate-200/80">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
                   {getLocalizedName(selectedStudent, lang)}
@@ -852,7 +858,7 @@ export const BehaviorModule: React.FC = () => {
                   )}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold whitespace-nowrap"
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>{tr('whatsappFather', lang)}</span>
@@ -861,7 +867,7 @@ export const BehaviorModule: React.FC = () => {
                   type="button"
                   disabled={exportingPdf}
                   onClick={() => void handleExportPdf(selectedStudent)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer disabled:opacity-60 whitespace-nowrap"
                 >
                   <FileDown className="w-4 h-4" />
                   <span>{tr('exportPdfEnglish', lang)}</span>
@@ -870,7 +876,7 @@ export const BehaviorModule: React.FC = () => {
                   type="button"
                   aria-label="Close student profile"
                   onClick={() => setSelectedStudent(null)}
-                  className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 cursor-pointer"
+                  className="p-2 rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -879,7 +885,7 @@ export const BehaviorModule: React.FC = () => {
 
             {/* Summary Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-5">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80">
                 <p className="text-xs text-slate-500 font-semibold">
                   {lang === 'ar' ? 'إجمالي المخالفات' : 'Total Incidents'}
                 </p>
@@ -887,7 +893,7 @@ export const BehaviorModule: React.FC = () => {
                   {selectedStudentLogs.length}
                 </p>
               </div>
-              <div className="sm:col-span-2 p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="sm:col-span-2 p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80">
                 <p className="text-xs text-slate-500 font-semibold mb-2">
                   {lang === 'ar' ? 'التوزيع حسب نوع السلوك' : 'Breakdown by Behavior Type'}
                 </p>
@@ -896,9 +902,12 @@ export const BehaviorModule: React.FC = () => {
                     {lang === 'ar' ? 'سجل نظيف بدون مخالفات' : 'Clean behavior record'}
                   </p>
                 ) : (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700">
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-700">
                     {selectedStudentBreakdown.map(([label, count]) => (
-                      <span key={label}>
+                      <span
+                        key={label}
+                        className="px-3 py-1 rounded-full bg-white border border-slate-200/80"
+                      >
                         {label}: <strong className="tabular-nums">{count}</strong>
                       </span>
                     ))}
@@ -944,18 +953,18 @@ export const BehaviorModule: React.FC = () => {
                     }).format(dt);
                     return (
                       <tr key={l.id}>
-                        <td className="py-2 px-2 font-mono tabular-nums">{datePart}</td>
-                        <td className="py-2 px-2 font-mono tabular-nums">{timePart}</td>
-                        <td className="py-2 px-2 tabular-nums">
+                        <td className="py-2.5 px-2 font-mono tabular-nums">{datePart}</td>
+                        <td className="py-2.5 px-2 font-mono tabular-nums">{timePart}</td>
+                        <td className="py-2.5 px-2 tabular-nums">
                           {l.period_number ? `P${l.period_number}` : '-'}
                         </td>
-                        <td className="py-2 px-2 font-semibold text-red-700">
+                        <td className="py-2.5 px-2 font-semibold text-red-700">
                           {getLocalizedName(catMap.get(l.behavior_category_id), lang)}
                         </td>
-                        <td className="py-2 px-2">
+                        <td className="py-2.5 px-2">
                           {getLocalizedName(profMap.get(l.teacher_id), lang)}
                         </td>
-                        <td className="py-2 px-2">
+                        <td className="py-2.5 px-2">
                           {l.subject_id ? getLocalizedName(subMap.get(l.subject_id), lang) : '-'}
                         </td>
                       </tr>

@@ -16,7 +16,7 @@
 ├── src/
 │   ├── main.tsx                      # React 19 root mount
 │   ├── App.tsx                       # Root routing between Auth, Onboarding, and App Shell
-│   ├── index.css                     # Tailwind CSS v4 + MEIS glassmorphism & mesh theme
+│   ├── index.css                     # Tailwind CSS v4 + 5-Theme CSS variables & Bento glass surfaces
 │   ├── assets/images/                # Generated MEIS school crest emblem
 │   ├── lib/
 │   │   └── supabase.ts               # Live Supabase client (@supabase/supabase-js)
@@ -27,21 +27,34 @@
 │   │   ├── riyadhTime.ts             # Asia/Riyadh (UTC+3) clock, Sun–Thu calendar & active bell helper
 │   │   ├── schoolRules.ts            # Pure business logic (conflicts, watchlist, Excel parser, WhatsApp)
 │   │   ├── schoolRules.test.ts       # Deterministic unit tests (node:test)
+│   │   ├── themes.ts                 # 5-Theme Color System definitions & localStorage key
 │   │   └── pdfExport.ts              # Strictly English-only PDF exports (jspdf + jspdf-autotable)
 │   ├── context/
-│   │   └── AppContext.tsx            # Auth, dummy login/impersonation, role switching, dynamic master data
+│   │   └── AppContext.tsx            # Auth, dummy login/impersonation, role switching, theme sync, master data
 │   └── components/
-│       ├── AuthScreen.tsx            # Google OAuth, @meis.sch.sa email login/signup, dummy login
+│       ├── AuthScreen.tsx            # Split 2-col glass card: Google OAuth, @meis.sch.sa auth, dummy login
 │       ├── OnboardingWizard.tsx      # 3-step onboarding (role, AR/EN names, subject/classes/division)
-│       ├── LayoutShell.tsx           # Sidebar + Mobile drawer/bottom nav + Riyadh clock header
+│       ├── LayoutShell.tsx           # Floating pill top nav bar + mobile drawer/dock + Riyadh clock header
 │       ├── NoticeBoardSection.tsx    # Active notice banner/carousel + Notice CRUD modal
-│       ├── DashboardHome.tsx         # Role-adapted overview & live alerts
+│       ├── DashboardHome.tsx         # Executive Bento dashboard (KPI pills, charts, dark watchlist, schedule)
+│       ├── ProfileSettingsModal.tsx  # Self-service profile & class assignment modal
 │       ├── BehaviorModule.tsx        # Recording, feed, watchlist, student profile, WhatsApp & PDF
 │       ├── PerformanceModule.tsx     # Report requests, teacher comments, tracker, 2-col English PDF
 │       ├── TimetableSubstitutionModule.tsx # Sun-Thu P1-7 grid, period-only conflict check, substitutions
 │       ├── DutyModule.tsx            # Single/range duty assignments with location_text
-│       └── AdminSuite.tsx            # Users/Dummy, Students/.xlsx UPSERT, Master Data, Global Records
+│       └── AdminSuite.tsx            # 5-Theme selector, Users/Dummy, Students/.xlsx UPSERT, Master Data, Records
 ```
+
+## 1b. Executive Glassmorphism & 5-Theme Color System
+
+- **Default Theme (`ocean-blue`)**: Soft sky & ice-blue ambient mesh backdrop (`meis-mesh-bg`), rounded frosted glass cards (`meis-card rounded-3xl`), deeply curved workspace shell (`meis-shell rounded-[2.5rem]`), and pill-shaped navigation/actions (`rounded-full`).
+- **5 Admin-Selectable Themes** (defined in `src/utils/themes.ts` & `src/index.css`):
+  1. `ocean-blue` (Default — MEIS Identity)
+  2. `royal-navy`
+  3. `forest-emerald`
+  4. `regal-maroon`
+  5. `royal-amethyst`
+- **Persistence & Sync**: Switching themes in `AdminSuite` calls `setTheme()` from `AppContext`, updates `data-theme` on `<html>`, and persists the selection under `localStorage['meis_ui_theme']`.
 
 ---
 

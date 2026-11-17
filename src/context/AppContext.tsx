@@ -18,6 +18,12 @@ import type {
   UserRole,
 } from '../types/database';
 import { isAllowedSchoolEmail } from '../utils/schoolRules';
+import {
+  DEFAULT_PORTAL_THEME,
+  isValidPortalTheme,
+  PORTAL_THEME_STORAGE_KEY,
+  type PortalThemeId,
+} from '../utils/themes';
 
 const DUMMY_PROFILE_KEY = 'meis_dummy_profile_id';
 const IMPERSONATE_PROFILE_KEY = 'meis_impersonated_profile_id';
@@ -35,6 +41,8 @@ interface AppContextValue {
   lang: Language;
   setLang: (lang: Language) => void;
   toggleLang: () => void;
+  theme: PortalThemeId;
+  setTheme: (theme: PortalThemeId) => void;
   authLoading: boolean;
   masterLoading: boolean;
   userProfile: Profile | null;
@@ -77,6 +85,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved === 'en' ? 'en' : 'ar';
   });
 
+  const [theme, setThemeState] = useState<PortalThemeId>(() => {
+    const saved = localStorage.getItem(PORTAL_THEME_STORAGE_KEY);
+    return isValidPortalTheme(saved) ? saved : DEFAULT_PORTAL_THEME;
+  });
+
   const [authLoading, setAuthLoading] = useState(true);
   const [masterLoading, setMasterLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
@@ -105,10 +118,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLang(lang === 'ar' ? 'en' : 'ar');
   }, [lang, setLang]);
 
+  const setTheme = useCallback((next: PortalThemeId) => {
+    setThemeState(next);
+    localStorage.setItem(PORTAL_THEME_STORAGE_KEY, next);
+  }, []);
+
   useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   }, [lang]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const refreshMasterData = useCallback(async () => {
     setMasterLoading(true);
@@ -515,6 +537,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lang,
         setLang,
         toggleLang,
+        theme,
+        setTheme,
         authLoading,
         masterLoading,
         userProfile,

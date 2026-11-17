@@ -311,7 +311,7 @@ export const PerformanceModule: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-slate-900">
           {lang === 'ar' ? 'تقارير الأداء الأكاديمي' : 'Student Performance Reports'}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
@@ -323,8 +323,8 @@ export const PerformanceModule: React.FC = () => {
 
       {/* Teacher Pending Comments Queue */}
       {(activeRole === 'teacher' || myTeacherComments.length > 0) && (
-        <section className="meis-glass rounded-2xl p-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+        <section className="meis-card rounded-3xl p-5 sm:p-6">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200/70">
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {lang === 'ar'
@@ -354,13 +354,13 @@ export const PerformanceModule: React.FC = () => {
                 return (
                   <div
                     key={c.id}
-                    className={`p-4 rounded-xl border ${
+                    className={`p-4 rounded-2xl border ${
                       c.is_submitted
-                        ? 'bg-emerald-50/40 border-emerald-200'
-                        : 'bg-white border-slate-200'
+                        ? 'bg-emerald-50/50 border-emerald-200'
+                        : 'bg-white/85 border-slate-200/70'
                     }`}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                       <div>
                         <p className="text-sm font-bold text-slate-900">
                           {st ? getLocalizedName(st, lang) : 'Student'}
@@ -371,8 +371,10 @@ export const PerformanceModule: React.FC = () => {
                         </p>
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1 text-xs font-bold ${
-                          c.is_submitted ? 'text-emerald-700' : 'text-amber-700'
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
+                          c.is_submitted
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-800'
                         }`}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -388,7 +390,7 @@ export const PerformanceModule: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2.5">
                       <textarea
                         rows={2}
                         value={drafts[c.id] || ''}
@@ -398,13 +400,13 @@ export const PerformanceModule: React.FC = () => {
                             ? 'اكتب فقرة تقييمية عن مستوى الطالب في مادتك (يفضل بالإنجليزية لظهورها في ملف PDF)...'
                             : 'Write a 1-paragraph academic evaluation for this student (English recommended for PDF)...'
                         }
-                        className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                        className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                       />
                       <button
                         type="button"
                         disabled={savingCommentId === c.id || !(drafts[c.id] || '').trim()}
                         onClick={() => void handleSubmitTeacherComment(c)}
-                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-50 shrink-0"
+                        className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap self-start sm:self-center"
                       >
                         <Send className="w-3.5 h-3.5" />
                         <span>
@@ -426,19 +428,19 @@ export const PerformanceModule: React.FC = () => {
 
       {/* Request New Performance Report (Principal, Academic Supervisor, Admin) */}
       {canRequest && (
-        <section className="meis-glass rounded-2xl p-5">
-          <h2 className="text-base font-bold text-slate-900 mb-3">
+        <section className="meis-card rounded-3xl p-5 sm:p-6">
+          <h2 className="text-base font-bold text-slate-900 mb-3.5">
             {lang === 'ar' ? 'طلب تقرير أداء طالب جديد' : 'Request New Student Performance Report'}
           </h2>
           <form onSubmit={handleRequestReport} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute top-3 start-3" />
+              <Search className="w-4 h-4 text-slate-400 absolute top-3 start-4" />
               <input
                 type="text"
                 value={searchIqama}
                 onChange={(e) => setSearchIqama(e.target.value)}
                 placeholder={lang === 'ar' ? 'بحث بالاسم أو الإقامة...' : 'Search ID/Iqama or name...'}
-                className="w-full ps-9 pe-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full ps-10 pe-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
@@ -448,7 +450,7 @@ export const PerformanceModule: React.FC = () => {
                 setReqGradeId(e.target.value);
                 setReqStudentId('');
               }}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+              className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
             >
               <option value="">{lang === 'ar' ? 'جميع الصفوف' : 'All Grades'}</option>
               {scope.grades.map((g) => (
@@ -464,7 +466,7 @@ export const PerformanceModule: React.FC = () => {
                 setReqSectionId(e.target.value);
                 setReqStudentId('');
               }}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+              className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
             >
               <option value="">{lang === 'ar' ? 'جميع الشعب' : 'All Sections'}</option>
               {scope.sections.map((s) => (
@@ -478,7 +480,7 @@ export const PerformanceModule: React.FC = () => {
               required
               value={reqStudentId}
               onChange={(e) => setReqStudentId(e.target.value)}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+              className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
             >
               <option value="">{lang === 'ar' ? '-- اختر الطالب --' : '-- Select Student --'}</option>
               {matchingRequestStudents.map((st) => (
@@ -488,7 +490,7 @@ export const PerformanceModule: React.FC = () => {
               ))}
             </select>
 
-            <div className="sm:col-span-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="sm:col-span-4 flex flex-wrap items-center justify-between gap-3 pt-1">
               {statusMsg ? (
                 <p
                   className={`text-xs font-semibold ${
@@ -507,7 +509,7 @@ export const PerformanceModule: React.FC = () => {
               <button
                 type="submit"
                 disabled={creating || !reqStudentId}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full meis-pill-dark text-sm font-semibold cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>
@@ -525,13 +527,13 @@ export const PerformanceModule: React.FC = () => {
 
       {/* Active & Completed Requests Tracker (Principal, Academic Supervisor, Supervisor, Admin) */}
       {canViewTracker && (
-        <section className="meis-glass rounded-2xl p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+        <section className="meis-card rounded-3xl p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/70">
             <h2 className="text-base font-bold text-slate-900">
               {lang === 'ar' ? 'متابعة تقارير الأداء المطلوبة' : 'Requested Reports Progress'}
             </h2>
             <div className="relative w-full sm:w-72">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3.5" />
               <input
                 type="text"
                 value={trackerSearchQuery}
@@ -541,7 +543,7 @@ export const PerformanceModule: React.FC = () => {
                     ? 'بحث بالطالب (عربي/إنجليزي) أو الإقامة...'
                     : 'Search student (EN/AR) or ID...'
                 }
-                className="w-full ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+                className="w-full ps-9 pe-3.5 py-2 rounded-full border border-slate-200/80 bg-white/90 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
           </div>
@@ -564,7 +566,7 @@ export const PerformanceModule: React.FC = () => {
                 return (
                   <div
                     key={req.id}
-                    className="p-4 rounded-xl bg-white border border-slate-200/80 flex flex-wrap items-center justify-between gap-4"
+                    className="p-4 rounded-2xl bg-white/85 border border-slate-200/70 flex flex-wrap items-center justify-between gap-4"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-slate-900">
@@ -586,7 +588,7 @@ export const PerformanceModule: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setPreviewReq(req)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer whitespace-nowrap"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>{lang === 'ar' ? 'معاينة' : 'Preview'}</span>
@@ -594,7 +596,7 @@ export const PerformanceModule: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => void handleDownloadPdf(req)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full meis-accent-solid text-xs font-semibold cursor-pointer whitespace-nowrap"
                       >
                         <FileDown className="w-3.5 h-3.5" />
                         <span>{lang === 'ar' ? 'تحميل PDF' : 'Download PDF Report'}</span>
@@ -604,7 +606,7 @@ export const PerformanceModule: React.FC = () => {
                           href={buildWhatsAppUrl(st.father_mobile, buildReportWhatsAppMsg(st))}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold whitespace-nowrap"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                           <span>{tr('whatsappFather', lang)}</span>
@@ -615,7 +617,7 @@ export const PerformanceModule: React.FC = () => {
                           type="button"
                           aria-label="Delete report request"
                           onClick={() => void handleDeleteRequest(req.id)}
-                          className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 cursor-pointer"
+                          className="p-2 rounded-full border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -631,15 +633,15 @@ export const PerformanceModule: React.FC = () => {
 
       {/* Preview Modal */}
       {previewReq && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-3xl w-full p-6 sm:p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
             {(() => {
               const st = studentMap.get(previewReq.student_id);
               const cs = st ? classMap.get(st.class_section_id) : undefined;
               const reqComments = comments.filter((c) => c.request_id === previewReq.id);
               return (
                 <>
-                  <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200">
+                  <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200/80">
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">
                         {st?.name_en || 'Student Performance Report'}
@@ -653,7 +655,7 @@ export const PerformanceModule: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => void handleDownloadPdf(previewReq)}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full meis-accent-solid text-xs font-semibold cursor-pointer whitespace-nowrap"
                       >
                         <FileDown className="w-4 h-4" />
                         <span>Download PDF Report</span>
@@ -662,7 +664,7 @@ export const PerformanceModule: React.FC = () => {
                         type="button"
                         aria-label="Close preview"
                         onClick={() => setPreviewReq(null)}
-                        className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 cursor-pointer"
+                        className="p-2 rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
                       >
                         <X className="w-5 h-5" />
                       </button>
@@ -670,11 +672,11 @@ export const PerformanceModule: React.FC = () => {
                   </div>
 
                   <div className="mt-4 overflow-x-auto">
-                    <table className="w-full text-sm border border-blue-200 rounded-xl overflow-hidden" dir="ltr">
-                      <thead className="bg-blue-50 text-blue-950 border-b border-blue-200 text-xs">
+                    <table className="w-full text-sm border border-sky-200 rounded-2xl overflow-hidden" dir="ltr">
+                      <thead className="bg-sky-50 text-slate-900 border-b border-sky-200 text-xs">
                         <tr>
-                          <th className="py-2.5 px-4 text-left w-48 font-bold">Subject Name</th>
-                          <th className="py-2.5 px-4 text-left font-bold">Teacher&apos;s Comment</th>
+                          <th className="py-3 px-4 text-left w-48 font-bold">Subject Name</th>
+                          <th className="py-3 px-4 text-left font-bold">Teacher&apos;s Comment</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">

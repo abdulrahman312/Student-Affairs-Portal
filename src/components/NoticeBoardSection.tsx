@@ -61,7 +61,7 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
   if (activeNotices.length === 0) {
     if (!canPublish) return null;
     return (
-      <div className="meis-glass rounded-2xl p-4 flex items-center justify-between gap-4">
+      <div className="meis-card rounded-3xl p-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 text-sm text-slate-600">
           <Megaphone className="w-4 h-4 text-slate-400 shrink-0" />
           <span>
@@ -74,7 +74,7 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
           <button
             type="button"
             onClick={onOpenManager}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold whitespace-nowrap cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{lang === 'ar' ? 'نشر إعلان' : 'Publish Notice'}</span>
@@ -99,7 +99,7 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
   const priorityStyles: Record<NoticePriority, string> = {
     urgent: 'bg-red-50/90 border-red-200 text-red-950',
     important: 'bg-amber-50/90 border-amber-200 text-amber-950',
-    normal: 'bg-sky-50/90 border-sky-200 text-slate-900',
+    normal: 'meis-card text-slate-900',
   };
 
   const priorityLabel: Record<NoticePriority, { ar: string; en: string }> = {
@@ -111,11 +111,11 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
   return (
     <section
       aria-label={lang === 'ar' ? 'لوحة الإعلانات النشطة' : 'Active Notice Board'}
-      className={`rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-colors ${priorityStyles[current.priority]}`}
+      className={`rounded-3xl border p-4 sm:p-5 backdrop-blur-md transition-colors ${priorityStyles[current.priority]}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0 flex-1">
-          <div className="p-2.5 rounded-xl bg-white/80 border border-black/5 shrink-0">
+          <div className="p-2.5 rounded-full bg-white/90 border border-white shadow-xs shrink-0">
             <Megaphone className="w-5 h-5 text-slate-900" />
           </div>
           <div className="min-w-0 flex-1">
@@ -137,14 +137,14 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
 
         <div className="flex items-center gap-2 shrink-0">
           {activeNotices.length > 1 && (
-            <div className="flex items-center gap-1 bg-white/70 rounded-xl p-1 border border-black/5">
+            <div className="flex items-center gap-1 bg-white/80 rounded-full p-1 border border-white">
               <button
                 type="button"
                 aria-label="Previous notice"
                 onClick={() =>
                   setActiveIndex((i) => (i - 1 + activeNotices.length) % activeNotices.length)
                 }
-                className="p-1 rounded-lg hover:bg-white cursor-pointer"
+                className="p-1.5 rounded-full hover:bg-white cursor-pointer"
               >
                 {lang === 'ar' ? (
                   <ChevronRight className="w-4 h-4" />
@@ -152,14 +152,14 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
                   <ChevronLeft className="w-4 h-4" />
                 )}
               </button>
-              <span className="text-xs font-bold px-1.5 tabular-nums">
+              <span className="text-xs font-bold px-2 tabular-nums">
                 {safeIdx + 1} / {activeNotices.length}
               </span>
               <button
                 type="button"
                 aria-label="Next notice"
                 onClick={() => setActiveIndex((i) => (i + 1) % activeNotices.length)}
-                className="p-1 rounded-lg hover:bg-white cursor-pointer"
+                className="p-1.5 rounded-full hover:bg-white cursor-pointer"
               >
                 {lang === 'ar' ? (
                   <ChevronLeft className="w-4 h-4" />
@@ -174,7 +174,7 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
             <button
               type="button"
               onClick={onOpenManager}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{lang === 'ar' ? 'نشر إعلان' : 'Publish Notice'}</span>
@@ -295,6 +295,12 @@ export const NoticeBoardManager: React.FC = () => {
     await refreshMasterData();
   };
 
+  const priorityPillStyle: Record<NoticePriority, string> = {
+    urgent: 'bg-red-100 text-red-800 border-red-200',
+    important: 'bg-amber-100 text-amber-800 border-amber-200',
+    normal: 'meis-accent-pill',
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -311,7 +317,7 @@ export const NoticeBoardManager: React.FC = () => {
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold cursor-pointer"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full meis-pill-dark text-sm font-semibold cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>{lang === 'ar' ? 'نشر إعلان جديد' : 'Publish Notice'}</span>
@@ -320,7 +326,7 @@ export const NoticeBoardManager: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-4">
         {notices.length === 0 ? (
-          <div className="meis-glass rounded-2xl p-10 text-center text-sm text-slate-500">
+          <div className="meis-card rounded-3xl p-10 text-center text-sm text-slate-500">
             {lang === 'ar' ? 'لا توجد إعلانات منشورة حتى الآن.' : 'No notices published yet.'}
           </div>
         ) : (
@@ -330,10 +336,17 @@ export const NoticeBoardManager: React.FC = () => {
             const publisher = profiles.find((p) => p.id === n.published_by);
             const div = divisions.find((d) => d.id === n.target_division_id);
             return (
-              <div key={n.id} className="meis-glass rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div
+                key={n.id}
+                className="meis-card rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              >
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1">
-                    <span className="font-bold text-slate-800 uppercase">{n.priority}</span>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-2">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold uppercase ${priorityPillStyle[n.priority]}`}
+                    >
+                      {n.priority}
+                    </span>
                     <span aria-hidden="true">·</span>
                     <span>
                       {div ? getLocalizedName(div, lang) : lang === 'ar' ? 'جميع المراحل' : 'All Divisions'}
@@ -345,7 +358,7 @@ export const NoticeBoardManager: React.FC = () => {
                     {activeToday && (
                       <>
                         <span aria-hidden="true">·</span>
-                        <span className="text-emerald-700 font-bold">
+                        <span className="meis-accent-text font-bold">
                           {lang === 'ar' ? 'نشط اليوم' : 'Active Today'}
                         </span>
                       </>
@@ -366,7 +379,7 @@ export const NoticeBoardManager: React.FC = () => {
                     type="button"
                     aria-label={`Edit ${localized.title}`}
                     onClick={() => openEdit(n)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>{lang === 'ar' ? 'تعديل' : 'Edit'}</span>
@@ -375,7 +388,7 @@ export const NoticeBoardManager: React.FC = () => {
                     type="button"
                     aria-label={`Delete ${localized.title}`}
                     onClick={() => void handleDelete(n.id)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-700 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-700 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>{lang === 'ar' ? 'حذف' : 'Delete'}</span>
@@ -389,8 +402,8 @@ export const NoticeBoardManager: React.FC = () => {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-2xl w-full p-6 sm:p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200/80">
               <h2 className="text-lg font-bold text-slate-900">
                 {editingNotice
                   ? lang === 'ar'
@@ -404,9 +417,9 @@ export const NoticeBoardManager: React.FC = () => {
                 type="button"
                 aria-label="Close modal"
                 onClick={() => setModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -420,7 +433,7 @@ export const NoticeBoardManager: React.FC = () => {
                     type="text"
                     value={titleAr}
                     onChange={(e) => setTitleAr(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm"
                   />
                 </div>
                 <div>
@@ -432,7 +445,7 @@ export const NoticeBoardManager: React.FC = () => {
                     dir="ltr"
                     value={titleEn}
                     onChange={(e) => setTitleEn(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm"
                   />
                 </div>
               </div>
@@ -446,7 +459,7 @@ export const NoticeBoardManager: React.FC = () => {
                     rows={3}
                     value={contentAr}
                     onChange={(e) => setContentAr(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm"
                   />
                 </div>
                 <div>
@@ -458,7 +471,7 @@ export const NoticeBoardManager: React.FC = () => {
                     dir="ltr"
                     value={contentEn}
                     onChange={(e) => setContentEn(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm"
                   />
                 </div>
               </div>
@@ -471,7 +484,7 @@ export const NoticeBoardManager: React.FC = () => {
                   <select
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as NoticePriority)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm bg-white"
                   >
                     <option value="normal">{lang === 'ar' ? 'عادي' : 'Normal'}</option>
                     <option value="important">{lang === 'ar' ? 'مهم' : 'Important'}</option>
@@ -486,7 +499,7 @@ export const NoticeBoardManager: React.FC = () => {
                   <select
                     value={targetDivisionId}
                     onChange={(e) => setTargetDivisionId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm bg-white"
                   >
                     <option value="">{lang === 'ar' ? 'جميع المراحل' : 'All Divisions'}</option>
                     {divisions.map((d) => (
@@ -504,7 +517,7 @@ export const NoticeBoardManager: React.FC = () => {
                   <select
                     value={dateMode}
                     onChange={(e) => setDateMode(e.target.value as 'single' | 'range')}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm bg-white"
                   >
                     <option value="single">{lang === 'ar' ? 'يوم واحد' : 'Single Date'}</option>
                     <option value="range">{lang === 'ar' ? 'نطاق تاريخ' : 'Date Range'}</option>
@@ -529,7 +542,7 @@ export const NoticeBoardManager: React.FC = () => {
                     required
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm"
                   />
                 </div>
                 {dateMode === 'range' && (
@@ -543,30 +556,30 @@ export const NoticeBoardManager: React.FC = () => {
                       required
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                      className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-sm"
                     />
                   </div>
                 )}
               </div>
 
               {errorMsg && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-medium text-red-700">
+                <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-medium text-red-700">
                   {errorMsg}
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200/80">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="px-5 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   {lang === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold cursor-pointer disabled:opacity-60"
+                  className="px-6 py-2 rounded-full meis-pill-dark text-sm font-semibold cursor-pointer disabled:opacity-60"
                 >
                   {saving
                     ? lang === 'ar'

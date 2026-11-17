@@ -189,7 +189,7 @@ export const DutyModule: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-slate-900">
           {lang === 'ar' ? 'المناوبات اليومية للمعلمين' : 'Teacher Duty Assignments'}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
@@ -201,7 +201,7 @@ export const DutyModule: React.FC = () => {
 
       {/* Teacher's Highlighted Active Duties Today */}
       {myActiveDutiesToday.length > 0 && (
-        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-5">
+        <section className="rounded-3xl border border-emerald-200/90 bg-emerald-50/85 backdrop-blur-md p-5 sm:p-6">
           <h2 className="text-sm font-bold text-emerald-950 mb-3 flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4 text-emerald-700" />
             <span>
@@ -212,7 +212,7 @@ export const DutyModule: React.FC = () => {
             {myActiveDutiesToday.map((d) => {
               const dt = dutyTypeMap.get(d.duty_type_id);
               return (
-                <div key={d.id} className="p-3.5 rounded-xl bg-white border border-emerald-200">
+                <div key={d.id} className="p-4 rounded-2xl bg-white/95 border border-emerald-200/80 shadow-xs">
                   <p className="text-sm font-bold text-slate-900">{getLocalizedName(dt, lang)}</p>
                   <p className="text-xs text-slate-700 mt-1 flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -230,18 +230,18 @@ export const DutyModule: React.FC = () => {
 
       {/* Assign Duty Form */}
       {canAssign && (
-        <section className="meis-glass rounded-2xl p-5">
+        <section className="meis-card rounded-3xl p-5 sm:p-6">
           <h2 className="text-base font-bold text-slate-900 mb-4">
             {lang === 'ar' ? 'تكليف بمناوبة جديدة' : 'Assign New Duty'}
           </h2>
-          <form onSubmit={handleAssignDuty} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <form onSubmit={handleAssignDuty} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'المعلم (بحث عربي/إنجليزي)' : 'Teacher (Search EN/AR)'}
               </label>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3.5" />
                   <input
                     type="text"
                     value={teacherSearch}
@@ -256,14 +256,14 @@ export const DutyModule: React.FC = () => {
                     placeholder={
                       lang === 'ar' ? 'ابحث باسم المعلم...' : 'Search teacher EN / AR...'
                     }
-                    className="w-full ps-8 pe-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs"
+                    className="w-full ps-9 pe-3.5 py-2 rounded-full border border-slate-200/80 bg-white/90 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                   />
                 </div>
                 <select
                   required
                   value={teacherId}
                   onChange={(e) => setTeacherId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 >
                   {filteredTeachersList.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -275,14 +275,14 @@ export const DutyModule: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'نوع المناوبة' : 'Duty Type'}
               </label>
               <select
                 required
                 value={dutyTypeId}
                 onChange={(e) => setDutyTypeId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 {dutyTypes.map((dt) => (
                   <option key={dt.id} value={dt.id}>
@@ -293,13 +293,13 @@ export const DutyModule: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'نمط التاريخ' : 'Schedule'}
               </label>
               <select
                 value={dateMode}
                 onChange={(e) => setDateMode(e.target.value as 'single' | 'range')}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="single">{lang === 'ar' ? 'تاريخ واحد' : 'Single Date'}</option>
                 <option value="range">{lang === 'ar' ? 'نطاق تاريخ' : 'Date Range'}</option>
@@ -307,7 +307,7 @@ export const DutyModule: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {dateMode === 'single'
                   ? lang === 'ar'
                     ? 'التاريخ'
@@ -322,13 +322,13 @@ export const DutyModule: React.FC = () => {
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
             {dateMode === 'range' && (
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   {lang === 'ar' ? 'إلى تاريخ' : 'End Date'}
                 </label>
                 <input
@@ -337,13 +337,13 @@ export const DutyModule: React.FC = () => {
                   required
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
             )}
 
             <div className={dateMode === 'range' ? 'sm:col-span-2 lg:col-span-4' : 'sm:col-span-2 lg:col-span-4'}>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'موقع المناوبة' : 'Duty Location'}
               </label>
               <input
@@ -356,7 +356,7 @@ export const DutyModule: React.FC = () => {
                     ? 'مثال: ممر الدور الثاني، البوابة الرئيسية 2، ساحة الابتدائية...'
                     : 'e.g., 2nd Floor Corridor, Main Gate 2, Lower Grade Courtyard...'
                 }
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
@@ -364,7 +364,7 @@ export const DutyModule: React.FC = () => {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                className="w-full py-2.5 px-5 rounded-full meis-pill-dark text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 whitespace-nowrap shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 <span>{saving ? tr('loading', lang) : lang === 'ar' ? 'إسناد المناوبة' : 'Assign Duty'}</span>
@@ -373,7 +373,7 @@ export const DutyModule: React.FC = () => {
           </form>
 
           {errorMsg && (
-            <div className="mt-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+            <div className="mt-3 px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
               {errorMsg}
             </div>
           )}
@@ -381,8 +381,8 @@ export const DutyModule: React.FC = () => {
       )}
 
       {/* Duties Table */}
-      <section className="meis-glass rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+      <section className="meis-card rounded-3xl p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/70">
           <h2 className="text-base font-bold text-slate-900">
             {canAssign
               ? lang === 'ar'
@@ -393,7 +393,7 @@ export const DutyModule: React.FC = () => {
                 : 'My Duty Schedule'}
           </h2>
           <div className="relative w-full sm:w-72">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3.5" />
             <input
               type="text"
               value={dutyListSearch}
@@ -403,7 +403,7 @@ export const DutyModule: React.FC = () => {
                   ? 'بحث بالمعلم أو الموقع (عربي/إنجليزي)...'
                   : 'Search teacher (EN/AR) or location...'
               }
-              className="w-full ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+              className="w-full ps-9 pe-3.5 py-2 rounded-full border border-slate-200/80 bg-white/90 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30"
             />
           </div>
         </div>
@@ -411,7 +411,7 @@ export const DutyModule: React.FC = () => {
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs text-slate-500">
+              <tr className="border-b border-slate-200/80 text-xs text-slate-500">
                 <th className="py-2.5 px-3 text-start font-semibold">
                   {lang === 'ar' ? 'المعلم' : 'Teacher'}
                 </th>
@@ -449,39 +449,39 @@ export const DutyModule: React.FC = () => {
                   const dt = dutyTypeMap.get(d.duty_type_id);
                   const activeToday = isDateInRange(riyadhToday, d.start_date, d.end_date);
                   return (
-                    <tr key={d.id} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                    <tr key={d.id} className="hover:bg-white/60 transition-colors">
+                      <td className="py-3 px-3 font-semibold text-slate-900">
                         {getLocalizedName(teacher, lang)}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-700">{getLocalizedName(dt, lang)}</td>
-                      <td className="py-2.5 px-3 text-slate-700">{d.location_text}</td>
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-xs text-slate-600">
+                      <td className="py-3 px-3 text-slate-700">{getLocalizedName(dt, lang)}</td>
+                      <td className="py-3 px-3 text-slate-700">{d.location_text}</td>
+                      <td className="py-3 px-3 font-mono tabular-nums text-xs text-slate-600">
                         {d.start_date === d.end_date
                           ? d.start_date
                           : `${d.start_date} → ${d.end_date}`}
                       </td>
-                      <td className="py-2.5 px-3 text-xs font-semibold">
+                      <td className="py-3 px-3 text-xs font-semibold">
                         {activeToday ? (
-                          <span className="text-emerald-700">
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                             {lang === 'ar' ? 'نشطة اليوم' : 'Active Today'}
                           </span>
                         ) : d.start_date > riyadhToday ? (
-                          <span className="text-sky-700">
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full meis-accent-pill">
                             {lang === 'ar' ? 'قادمة' : 'Upcoming'}
                           </span>
                         ) : (
-                          <span className="text-slate-400">
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
                             {lang === 'ar' ? 'منتهية' : 'Completed'}
                           </span>
                         )}
                       </td>
                       {canAssign && (
-                        <td className="py-2.5 px-3 text-end">
+                        <td className="py-3 px-3 text-end">
                           <button
                             type="button"
                             aria-label="Delete duty assignment"
                             onClick={() => void handleDeleteDuty(d.id)}
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                            className="p-2 rounded-full border border-slate-200/80 bg-white text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

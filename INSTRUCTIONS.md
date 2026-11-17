@@ -35,3 +35,7 @@
 
 6. **Riyadh Timezone (`Asia/Riyadh`)**
    - All live clocks, today-date filters, notice active ranges, duty active ranges, and absence/substitution dates use `Asia/Riyadh` (UTC+3).
+
+7. **5-Theme UI System (`src/utils/themes.ts` & `src/index.css`)**
+   - Default theme is `ocean-blue` (Light Blue Gradient), controlled via CSS custom properties under `[data-theme="..."]` on `<html>` and persisted in `localStorage` (`meis_ui_theme`).
+   - All 5 presets (`ocean-blue`, `royal-navy`, `forest-emerald`, `regal-maroon`, `royal-amethyst`) are switchable live from the Admin Suite (`AdminSuite.tsx`) and must retain high-contrast readability across both RTL Arabic and LTR English views.

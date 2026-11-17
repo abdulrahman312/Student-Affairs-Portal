@@ -459,7 +459,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-slate-900">
           {showTimetableEditor
             ? lang === 'ar'
               ? 'الجدول المدرسي وحصص الانتظار'
@@ -481,17 +481,17 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
       {/* Assigned Substitutions Banner for Logged-In Teacher */}
       {mySubstitutionsToday.length > 0 && (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 sm:p-5">
-          <h2 className="text-sm font-bold text-amber-950 mb-2">
+        <section className="rounded-3xl border border-amber-200/90 bg-amber-50/85 backdrop-blur-md p-5">
+          <h2 className="text-sm font-bold text-amber-950 mb-2.5">
             {lang === 'ar' ? 'حصص الانتظار المسندة إليك' : 'Your Assigned Substitution Periods'}
           </h2>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2.5">
             {mySubstitutionsToday.map((s) => {
               const cs = classMap.get(s.class_section_id);
               return (
                 <div
                   key={s.id}
-                  className="px-3.5 py-2 rounded-xl bg-white border border-amber-200 text-xs font-semibold text-slate-900"
+                  className="px-4 py-2 rounded-full bg-white/95 border border-amber-200/80 text-xs font-semibold text-slate-900 shadow-xs"
                 >
                   <span className="font-mono">{s.absence_date}</span> ·{' '}
                   <span>{lang === 'ar' ? `الحصة ${s.period_number}` : `Period ${s.period_number}`}</span> ·{' '}
@@ -505,8 +505,8 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
       {/* Weekly Timetable Grid — Only for Teachers & System Admin */}
       {showTimetableEditor && (
-      <section className="meis-glass rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+      <section className="meis-card rounded-3xl p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200/70">
           <div>
             <h2 className="text-base font-bold text-slate-900">
               {lang === 'ar' ? 'الجدول الأسبوعي' : 'Weekly Teaching Timetable'}
@@ -521,7 +521,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
           {canManageAll && (
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3.5" />
                 <input
                   type="text"
                   value={ttTeacherSearch}
@@ -534,7 +534,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                     if (firstMatch) setSelectedTeacherId(firstMatch.id);
                   }}
                   placeholder={lang === 'ar' ? 'بحث بالمعلم...' : 'Search teacher (EN/AR)...'}
-                  className="ps-8 pe-3 py-2 rounded-xl border border-slate-200 bg-white text-xs w-48"
+                  className="ps-9 pe-3.5 py-2 rounded-full border border-slate-200/80 bg-white/90 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
               <label htmlFor="tt-teacher-select" className="text-xs font-semibold text-slate-600">
@@ -544,7 +544,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                 id="tt-teacher-select"
                 value={viewingTeacherId}
                 onChange={(e) => setSelectedTeacherId(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold"
+                className="px-4 py-2 rounded-full border border-slate-200/80 bg-white/90 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 {filteredTtTeachers.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -559,7 +559,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-xs border-collapse min-w-[720px]">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500">
+              <tr className="border-b border-slate-200/80 text-slate-500">
                 <th className="py-2.5 px-3 text-start font-semibold w-28">
                   {lang === 'ar' ? 'اليوم / الحصة' : 'Day / Period'}
                 </th>
@@ -585,10 +585,10 @@ export const TimetableSubstitutionModule: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => openCellEditor(day, period)}
-                          className={`w-full min-h-[56px] p-2 rounded-xl border text-center transition-colors cursor-pointer ${
+                          className={`w-full min-h-[58px] p-2 rounded-2xl border text-center transition-colors cursor-pointer ${
                             slot
-                              ? 'bg-emerald-50/80 border-emerald-200 hover:bg-emerald-100/70'
-                              : 'bg-slate-50/70 border-slate-200/70 hover:bg-white text-slate-400'
+                              ? 'bg-emerald-50/85 border-emerald-200 hover:bg-emerald-100/75'
+                              : 'bg-white/60 border-slate-200/70 hover:bg-white text-slate-400'
                           }`}
                         >
                           {slot ? (
@@ -618,13 +618,13 @@ export const TimetableSubstitutionModule: React.FC = () => {
       {/* Mark Absence & Smart Substitution Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Mark Absence Card */}
-        <section className="lg:col-span-4 meis-glass rounded-2xl p-5">
-          <h2 className="text-base font-bold text-slate-900 mb-3">
+        <section className="lg:col-span-4 meis-card rounded-3xl p-5 sm:p-6">
+          <h2 className="text-base font-bold text-slate-900 mb-3.5">
             {lang === 'ar' ? 'تسجيل غياب معلم' : 'Mark Teacher Absence'}
           </h2>
-          <form onSubmit={handleMarkAbsence} className="space-y-3">
+          <form onSubmit={handleMarkAbsence} className="space-y-3.5">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'تاريخ الغياب' : 'Absence Date'}
               </label>
               <input
@@ -640,18 +640,18 @@ export const TimetableSubstitutionModule: React.FC = () => {
                     setWeekAnchorDate(next);
                   }
                 }}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
             {canManageAll && (
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   {lang === 'ar' ? 'المعلم (بحث عربي/إنجليزي)' : 'Teacher (Search EN/AR)'}
                 </label>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3" />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute top-2.5 start-3.5" />
                     <input
                       type="text"
                       value={absenceTeacherSearch}
@@ -666,14 +666,14 @@ export const TimetableSubstitutionModule: React.FC = () => {
                       placeholder={
                         lang === 'ar' ? 'ابحث باسم المعلم...' : 'Search teacher EN / AR...'
                       }
-                      className="w-full ps-8 pe-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs"
+                      className="w-full ps-9 pe-3.5 py-2 rounded-full border border-slate-200/80 bg-white/90 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                     />
                   </div>
                   <select
                     required
                     value={absenceTeacherId}
                     onChange={(e) => setAbsenceTeacherId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                   >
                     {filteredAbsenceTeachers.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -686,7 +686,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'السبب (اختياري)' : 'Reason (Optional)'}
               </label>
               <input
@@ -694,19 +694,19 @@ export const TimetableSubstitutionModule: React.FC = () => {
                 value={absenceReason}
                 onChange={(e) => setAbsenceReason(e.target.value)}
                 placeholder={lang === 'ar' ? 'إجازة مرضية / عذر...' : 'Sick leave / Personal...'}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
             {absenceError && (
-              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold">
+              <div className="px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold">
                 {absenceError}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 px-5 rounded-full meis-pill-dark text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap shadow-sm"
             >
               <CalendarX className="w-4 h-4" />
               <span>{lang === 'ar' ? 'تسجيل الغياب' : 'Mark Absent'}</span>
@@ -715,8 +715,8 @@ export const TimetableSubstitutionModule: React.FC = () => {
         </section>
 
         {/* Absences & Smart Substitution List (Current Day / Current Week) */}
-        <section className="lg:col-span-8 meis-glass rounded-2xl p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+        <section className="lg:col-span-8 meis-card rounded-3xl p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/70">
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {lang === 'ar'
@@ -739,13 +739,13 @@ export const TimetableSubstitutionModule: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1">
+              <div className="inline-flex p-1 bg-white/80 border border-slate-200/70 rounded-full gap-1">
                 <button
                   type="button"
                   onClick={() => setAbsenceViewMode('day')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                  className={`px-3.5 py-1 rounded-full text-xs font-semibold cursor-pointer whitespace-nowrap ${
                     absenceViewMode === 'day'
-                      ? 'bg-white text-slate-900 shadow-xs'
+                      ? 'meis-pill-dark shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -754,9 +754,9 @@ export const TimetableSubstitutionModule: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setAbsenceViewMode('week')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                  className={`px-3.5 py-1 rounded-full text-xs font-semibold cursor-pointer whitespace-nowrap ${
                     absenceViewMode === 'week'
-                      ? 'bg-white text-slate-900 shadow-xs'
+                      ? 'meis-pill-dark shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -770,7 +770,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                     type="button"
                     aria-label="Previous day"
                     onClick={() => setActiveDayDate((d) => addDaysToDateStr(d, -1))}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                    className="p-2 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
                   >
                     {lang === 'ar' ? (
                       <ChevronRight className="w-4 h-4" />
@@ -781,7 +781,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveDayDate(riyadhToday)}
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                    className="px-3 py-1.5 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer whitespace-nowrap"
                   >
                     {lang === 'ar' ? 'اليوم' : 'Today'}
                   </button>
@@ -789,7 +789,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                     type="button"
                     aria-label="Next day"
                     onClick={() => setActiveDayDate((d) => addDaysToDateStr(d, 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                    className="p-2 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
                   >
                     {lang === 'ar' ? (
                       <ChevronLeft className="w-4 h-4" />
@@ -804,7 +804,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                     type="button"
                     aria-label="Previous week"
                     onClick={() => setWeekAnchorDate((d) => addDaysToDateStr(d, -7))}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                    className="p-2 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
                   >
                     {lang === 'ar' ? (
                       <ChevronRight className="w-4 h-4" />
@@ -815,7 +815,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setWeekAnchorDate(riyadhToday)}
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                    className="px-3 py-1.5 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer whitespace-nowrap"
                   >
                     {lang === 'ar' ? 'هذا الأسبوع' : 'This Week'}
                   </button>
@@ -823,7 +823,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                     type="button"
                     aria-label="Next week"
                     onClick={() => setWeekAnchorDate((d) => addDaysToDateStr(d, 7))}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
+                    className="p-2 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer"
                   >
                     {lang === 'ar' ? (
                       <ChevronLeft className="w-4 h-4" />
@@ -839,7 +839,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   type="button"
                   disabled={exportingDayPdf}
                   onClick={() => void handleExportDayPdf()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full meis-accent-solid text-xs font-semibold cursor-pointer whitespace-nowrap disabled:opacity-60"
                 >
                   <FileDown className="w-3.5 h-3.5" />
                   <span>{lang === 'ar' ? 'تصدير PDF لليوم' : 'Export Day PDF'}</span>
@@ -884,23 +884,23 @@ export const TimetableSubstitutionModule: React.FC = () => {
                 return (
                   <div
                     key={abs.id}
-                    className={`p-4 rounded-xl bg-white border space-y-3 ${
-                      isToday ? 'border-emerald-300' : 'border-slate-200/80'
+                    className={`p-4 rounded-2xl bg-white/85 border space-y-3 ${
+                      isToday ? 'border-emerald-300' : 'border-slate-200/70'
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md tabular-nums">
+                          <span className="text-xs font-mono font-bold meis-accent-pill px-3 py-0.5 rounded-full tabular-nums">
                             {abs.absence_date} · {weekdayLabel}
                           </span>
                           {isToday && (
-                            <span className="text-[11px] font-bold text-emerald-700">
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">
                               {lang === 'ar' ? 'اليوم' : 'Today'}
                             </span>
                           )}
                           {isFuture && (
-                            <span className="text-[11px] font-bold text-amber-700">
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
                               {lang === 'ar' ? 'قادم' : 'Upcoming'}
                             </span>
                           )}
@@ -917,7 +917,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => void handleDeleteAbsence(abs.id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs font-semibold cursor-pointer"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold cursor-pointer whitespace-nowrap"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>{lang === 'ar' ? 'إلغاء الغياب' : 'Remove Absence'}</span>
@@ -948,7 +948,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                           return (
                             <div
                               key={slot.id}
-                              className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2"
+                              className="p-3 rounded-2xl bg-slate-50/90 border border-slate-200/70 flex items-center justify-between gap-2"
                             >
                               <div className="min-w-0">
                                 <p className="text-xs font-bold text-slate-900">
@@ -979,7 +979,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                                       setSubSearchQuery('');
                                       setAssignModal({ absence: abs, slot });
                                     }}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer whitespace-nowrap"
                                   >
                                     <UserPlus className="w-3.5 h-3.5" />
                                     <span>
@@ -997,7 +997,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                                       type="button"
                                       aria-label="Remove substitute"
                                       onClick={() => void handleRemoveSubstitution(assignedSub.id)}
-                                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-red-600 cursor-pointer"
+                                      className="p-2 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-red-600 cursor-pointer"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -1019,8 +1019,8 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
       {/* Edit Timetable Cell Modal */}
       {editingCell && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-md w-full p-6 sm:p-7 shadow-2xl">
             <h3 className="text-base font-bold text-slate-900 mb-1">
               {DAY_NAMES[editingCell.day][lang]} ·{' '}
               {lang === 'ar' ? `الحصة ${editingCell.period}` : `Period ${editingCell.period}`}
@@ -1031,14 +1031,14 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
             <form onSubmit={handleSaveSlot} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   {lang === 'ar' ? 'الفصل الدراسي' : 'Class Section'}
                 </label>
                 <select
                   required
                   value={cellClassId}
                   onChange={(e) => setCellClassId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 >
                   <option value="">
                     {lang === 'ar' ? '-- اختر الفصل --' : '-- Select Class --'}
@@ -1052,14 +1052,14 @@ export const TimetableSubstitutionModule: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   {lang === 'ar' ? 'المادة' : 'Subject'}
                 </label>
                 <select
                   required
                   value={cellSubjectId}
                   onChange={(e) => setCellSubjectId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 >
                   {viewingTeacherSubjects.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -1070,7 +1070,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
               </div>
 
               {cellError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700 flex items-start gap-2">
+                <div className="px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{cellError}</span>
                 </div>
@@ -1081,7 +1081,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void handleClearSlot()}
-                    className="px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-semibold text-red-700 cursor-pointer"
+                    className="px-4 py-2 rounded-full border border-red-200 bg-red-50 text-xs font-semibold text-red-700 cursor-pointer"
                   >
                     {lang === 'ar' ? 'إزالة الحصة' : 'Clear Slot'}
                   </button>
@@ -1093,13 +1093,13 @@ export const TimetableSubstitutionModule: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingCell(null)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+                    className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
                   >
                     {tr('cancel', lang)}
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                    className="px-5 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer"
                   >
                     {tr('save', lang)}
                   </button>
@@ -1112,9 +1112,9 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
       {/* Assign Substitute Modal */}
       {assignModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-xl max-h-[85vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-lg w-full p-6 sm:p-7 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-200/80">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
                   {lang === 'ar' ? 'اختيار معلم بديل (حصة انتظار)' : 'Assign Substitute Teacher'}
@@ -1130,7 +1130,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setAssignModal(null)}
-                className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
               >
                 {tr('close', lang)}
               </button>
@@ -1138,7 +1138,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
 
             <div className="mt-4 space-y-3">
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-3.5" />
+                <Search className="w-4 h-4 text-slate-400 absolute top-2.5 start-4" />
                 <input
                   type="text"
                   value={subSearchQuery}
@@ -1148,7 +1148,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                       ? 'ابحث عن المعلم بالاسم العربي أو الإنجليزي أو المادة...'
                       : 'Search teacher by English or Arabic name or subject...'
                   }
-                  className="w-full ps-10 pe-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                  className="w-full ps-10 pe-4 py-2.5 rounded-full border border-slate-200/80 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
 
@@ -1176,10 +1176,10 @@ export const TimetableSubstitutionModule: React.FC = () => {
                     return (
                       <div
                         key={cand.teacher.id}
-                        className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                        className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
                           cand.reachedLimit
-                            ? 'bg-red-50/70 border-red-200'
-                            : 'bg-slate-50 border-slate-200'
+                            ? 'bg-red-50/75 border-red-200'
+                            : 'bg-slate-50/90 border-slate-200/80'
                         }`}
                       >
                         <div className="min-w-0">
@@ -1213,7 +1213,7 @@ export const TimetableSubstitutionModule: React.FC = () => {
                           type="button"
                           disabled={cand.alreadyAssignedThisPeriod}
                           onClick={() => void handleAssignSubstitute(cand.teacher.id)}
-                          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-40 shrink-0"
+                          className="px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer disabled:opacity-40 shrink-0 whitespace-nowrap"
                         >
                           {cand.alreadyAssignedThisPeriod
                             ? lang === 'ar'

@@ -169,11 +169,11 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center shrink-0">
+    <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-2xl w-full p-6 sm:p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200/80">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full meis-accent-pill flex items-center justify-center shrink-0">
               <UserCog className="w-5 h-5" />
             </div>
             <div>
@@ -188,15 +188,15 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
             type="button"
             aria-label={tr('close', lang)}
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+            className="p-2 rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="space-y-4 mt-4">
+        <form onSubmit={handleSave} className="space-y-4 mt-5">
           {/* Read-only Assigned Roles */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+          <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-2.5">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
               <Lock className="w-3.5 h-3.5 text-slate-500" />
               <span>
@@ -209,7 +209,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
               {roles.map((r) => (
                 <span
                   key={r}
-                  className="px-3 py-1 rounded-lg bg-slate-900 text-white text-xs font-semibold"
+                  className="px-3.5 py-1 rounded-full meis-pill-dark text-xs font-semibold"
                 >
                   {ROLE_LABELS[r]?.[lang] || r}
                 </span>
@@ -220,7 +220,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
           {/* Names */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'الاسم الكامل (بالعربية)' : 'Full Name (Arabic)'}
               </label>
               <input
@@ -228,12 +228,12 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
                 required
                 value={nameAr}
                 onChange={(e) => setNameAr(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'الاسم الكامل (بالإنجليزية)' : 'Full Name (English)'}
               </label>
               <input
@@ -242,7 +242,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
                 dir="ltr"
                 value={nameEn}
                 onChange={(e) => setNameEn(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
           </div>
@@ -250,14 +250,14 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
           {/* Primary Subject (for Teacher) */}
           {isTeacher && (
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'المادة الأساسية' : 'Primary Subject'}
               </label>
               <select
                 required
                 value={primarySubjectId}
                 onChange={(e) => setPrimarySubjectId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="">
                   {lang === 'ar' ? '-- اختر المادة --' : '-- Select Subject --'}
@@ -274,14 +274,14 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
           {/* Assigned Division (for Principal / Academic Supervisor) */}
           {needsDivision && (
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {lang === 'ar' ? 'المرحلة الدراسية المسندة' : 'Assigned Division'}
               </label>
               <select
                 required
                 value={divisionId}
                 onChange={(e) => setDivisionId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="">
                   {lang === 'ar' ? '-- اختر المرحلة --' : '-- Select Division --'}
@@ -304,19 +304,19 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
                     ? 'الفصول الدراسية المسندة إليك'
                     : 'Your Assigned Class Sections'}
                 </label>
-                <span className="text-xs font-semibold text-emerald-700 tabular-nums">
+                <span className="px-2.5 py-0.5 rounded-full meis-accent-pill text-xs font-semibold tabular-nums">
                   {selectedClassIds.length} {lang === 'ar' ? 'محدد' : 'selected'}
                 </span>
               </div>
 
-              <div className="max-h-60 overflow-y-auto space-y-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="max-h-60 overflow-y-auto space-y-2.5 p-3 rounded-2xl bg-slate-50/90 border border-slate-200/80">
                 {groupedClassSections.map(({ grade, items }) => {
                   const itemIds = items.map((i) => i.id);
                   const allSelected = itemIds.every((id) => selectedClassIds.includes(id));
                   return (
                     <div
                       key={grade.id}
-                      className="p-2.5 rounded-lg bg-white border border-slate-200/80"
+                      className="p-3 rounded-2xl bg-white border border-slate-200/70"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-slate-800">
@@ -331,7 +331,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
                                 : Array.from(new Set([...prev, ...itemIds]))
                             )
                           }
-                          className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                          className="text-[11px] font-semibold meis-accent-text hover:underline cursor-pointer"
                         >
                           {allSelected
                             ? lang === 'ar'
@@ -350,9 +350,9 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
                               key={cs.id}
                               type="button"
                               onClick={() => toggleClassId(cs.id)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                              className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
                                 active
-                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  ? 'meis-accent-solid border-transparent shadow-xs'
                                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                               }`}
                             >
@@ -369,13 +369,13 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
           )}
 
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+            <div className="px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
               {errorMsg}
             </div>
           )}
 
           {successMsg && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
+            <div className="px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
               {successMsg}
             </div>
           )}
@@ -385,14 +385,14 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({ onCl
               type="button"
               disabled={saving}
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              className="px-5 py-2.5 rounded-full border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
               {tr('close', lang)}
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer disabled:opacity-60"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{saving ? tr('loading', lang) : tr('save', lang)}</span>

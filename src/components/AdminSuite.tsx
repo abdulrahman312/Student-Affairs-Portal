@@ -2,16 +2,15 @@ import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Check,
-  Database,
   Download,
   Edit3,
   FileSpreadsheet,
+  Palette,
   Plus,
   Search,
   Trash2,
   UserCheck,
   UserPlus,
-  Users,
   X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -25,6 +24,7 @@ import {
   validateRoleConfiguration,
   type ParsedStudentRow,
 } from '../utils/schoolRules';
+import { getThemeLabel, PORTAL_THEMES } from '../utils/themes';
 import { TimetableSubstitutionModule } from './TimetableSubstitutionModule';
 import { NoticeBoardManager } from './NoticeBoardSection';
 
@@ -51,6 +51,8 @@ const ALL_ROLES: UserRole[] = [
 export const AdminSuite: React.FC = () => {
   const {
     lang,
+    theme,
+    setTheme,
     userProfile,
     realAdminProfile,
     schoolSettings,
@@ -614,17 +616,17 @@ export const AdminSuite: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-slate-900">
             {lang === 'ar' ? 'مركز إدارة النظام الكامل' : 'System Administration Suite'}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             {lang === 'ar'
-              ? 'تحكم كامل بالمستخدمين والأدوار، استيراد الطلاب من Excel، الجداول المرجعية، والسجلات العامة.'
-              : '100% live control over staff multi-roles, dummy accounts, .xlsx student imports, academic structure, and global records.'}
+              ? 'تحكم كامل بالمستخدمين والأدوار، استيراد الطلاب من Excel، الجداول المرجعية، والثيمات اللونية.'
+              : '100% live control over staff multi-roles, dummy accounts, .xlsx student imports, academic structure, and portal themes.'}
           </p>
         </div>
 
-        <div className="inline-flex flex-wrap p-1 bg-slate-200/70 rounded-xl gap-1">
+        <div className="inline-flex flex-wrap p-1.5 bg-white/80 border border-white/90 rounded-full gap-1 shadow-xs">
           {(
             [
               ['users', lang === 'ar' ? 'المستخدمون والأدوار' : 'Users & Dummy'],
@@ -637,9 +639,9 @@ export const AdminSuite: React.FC = () => {
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
+              className={`px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap ${
                 tab === id
-                  ? 'bg-white text-slate-900 shadow-xs'
+                  ? 'meis-pill-dark shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -649,12 +651,85 @@ export const AdminSuite: React.FC = () => {
         </div>
       </div>
 
+      {/* ==================== 5-THEME PORTAL COLOR SYSTEM ==================== */}
+      <section
+        aria-label={lang === 'ar' ? 'مدير ألوان البوابة' : 'Portal 5-Theme Color System'}
+        className="meis-card rounded-3xl p-5 sm:p-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full meis-accent-pill flex items-center justify-center shrink-0">
+              <Palette className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                {lang === 'ar'
+                  ? 'نظام الألوان التفاعلي للبوابة (5 ثيمات)'
+                  : 'Interactive 5-Theme Portal Color System'}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {lang === 'ar'
+                  ? 'اختر المظهر العام للبوابة وسيتم تطبيقه وحفظه فورياً.'
+                  : 'Switch the entire MEIS portal palette instantaneously with live CSS preset sync.'}
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-full meis-accent-pill text-[11px] font-semibold whitespace-nowrap">
+            {lang === 'ar' ? 'محفوظ تلقائياً' : 'Live & Persisted'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {PORTAL_THEMES.map((preset) => {
+            const isActive = theme === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setTheme(preset.id)}
+                className={`p-3.5 rounded-2xl border text-start transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                  isActive
+                    ? 'bg-white border-slate-900 shadow-md ring-2 ring-slate-900/10'
+                    : 'bg-white/75 border-slate-200/80 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <div className="flex items-center -space-x-1.5 rtl:space-x-reverse">
+                    {preset.swatches.map((hex) => (
+                      <span
+                        key={hex}
+                        className="w-5 h-5 rounded-full border-2 border-white shadow-xs"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+                  {isActive && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full meis-pill-dark text-[10px] font-bold">
+                      <Check className="w-3 h-3" />
+                      <span>{lang === 'ar' ? 'نشط' : 'Active'}</span>
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900">
+                    {getThemeLabel(preset, lang)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
+                    {lang === 'ar' ? preset.descriptionAr : preset.descriptionEn}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* ==================== TAB 1: USERS & DUMMY ACCOUNTS ==================== */}
       {tab === 'users' && (
-        <section className="meis-glass rounded-2xl p-5 space-y-4">
+        <section className="meis-card rounded-3xl p-5 sm:p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="relative flex-1 min-w-[240px]">
-              <Search className="w-4 h-4 text-slate-400 absolute top-3 start-3.5" />
+              <Search className="w-4 h-4 text-slate-400 absolute top-3 start-4" />
               <input
                 type="text"
                 value={userSearch}
@@ -664,7 +739,7 @@ export const AdminSuite: React.FC = () => {
                     ? 'بحث بالاسم أو البريد الإلكتروني...'
                     : 'Search staff by name or email...'
                 }
-                className="w-full ps-10 pe-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"
+                className="w-full ps-10 pe-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
             </div>
 
@@ -682,7 +757,7 @@ export const AdminSuite: React.FC = () => {
                 setDummyClasses([]);
                 setDummyModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer whitespace-nowrap shadow-sm"
             >
               <UserPlus className="w-4 h-4" />
               <span>
@@ -693,7 +768,7 @@ export const AdminSuite: React.FC = () => {
 
           {userActionMsg && (
             <div
-              className={`p-3 rounded-xl border text-xs font-semibold ${
+              className={`px-4 py-3 rounded-2xl border text-xs font-semibold ${
                 userActionMsg.type === 'err'
                   ? 'bg-red-50 border-red-200 text-red-700'
                   : 'bg-emerald-50 border-emerald-200 text-emerald-800'
@@ -706,7 +781,7 @@ export const AdminSuite: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
+                <tr className="border-b border-slate-200/80 text-xs text-slate-500">
                   <th className="py-2.5 px-3 text-start font-semibold">
                     {lang === 'ar' ? 'الاسم' : 'Staff Name'}
                   </th>
@@ -728,31 +803,31 @@ export const AdminSuite: React.FC = () => {
                 {filteredProfiles.map((p) => {
                   const isSelf = p.id === userProfile?.id || p.id === realAdminProfile?.id;
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                    <tr key={p.id} className="hover:bg-white/60 transition-colors">
+                      <td className="py-3 px-3 font-semibold text-slate-900">
                         {getLocalizedName(p, lang)}
                       </td>
-                      <td className="py-2.5 px-3 font-mono text-xs text-slate-600">{p.email}</td>
-                      <td className="py-2.5 px-3 text-xs text-slate-700">
+                      <td className="py-3 px-3 font-mono text-xs text-slate-600">{p.email}</td>
+                      <td className="py-3 px-3 text-xs text-slate-700">
                         {p.roles.map((r) => ROLE_LABELS[r]?.[lang] || r).join(' · ')}
                       </td>
-                      <td className="py-2.5 px-3 text-xs">
+                      <td className="py-3 px-3 text-xs">
                         {p.is_dummy ? (
-                          <span className="text-amber-700 font-semibold">
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">
                             {lang === 'ar' ? 'حساب تجريبي' : 'Dummy'}
                           </span>
                         ) : (
-                          <span className="text-emerald-700 font-semibold">
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">
                             {lang === 'ar' ? 'رسمي' : 'Official'}
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-end">
+                      <td className="py-3 px-3 text-end">
                         <div className="inline-flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => void impersonateProfile(p.id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer whitespace-nowrap"
                           >
                             <UserCheck className="w-3.5 h-3.5" />
                             <span>{lang === 'ar' ? 'تقمص الدور' : 'Impersonate'}</span>
@@ -760,7 +835,7 @@ export const AdminSuite: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => openEditUser(p)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer whitespace-nowrap"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>{tr('edit', lang)}</span>
@@ -770,7 +845,7 @@ export const AdminSuite: React.FC = () => {
                               type="button"
                               aria-label={`Delete ${p.email}`}
                               onClick={() => setDeletingUser(p)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-700 cursor-pointer"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-700 cursor-pointer whitespace-nowrap"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>{tr('delete', lang)}</span>
@@ -790,7 +865,7 @@ export const AdminSuite: React.FC = () => {
       {/* ==================== TAB 2: STUDENTS & EXCEL IMPORTER ==================== */}
       {tab === 'students' && (
         <div className="space-y-6">
-          <section className="meis-glass rounded-2xl p-5 space-y-4">
+          <section className="meis-card rounded-3xl p-5 sm:p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">
@@ -808,14 +883,14 @@ export const AdminSuite: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleDownloadSampleExcel}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200/80 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer whitespace-nowrap"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>
                     {lang === 'ar' ? 'تحميل قالب Excel نموذجي' : 'Download Sample Excel Template'}
                   </span>
                 </button>
-                <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer">
+                <label className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer whitespace-nowrap">
                   <FileSpreadsheet className="w-3.5 h-3.5" />
                   <span>{lang === 'ar' ? 'رفع ملف Excel' : 'Upload .xlsx File'}</span>
                   <input
@@ -829,13 +904,13 @@ export const AdminSuite: React.FC = () => {
             </div>
 
             {importStatus && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
+              <div className="px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
                 {importStatus}
               </div>
             )}
 
             {parsedExcel && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs font-bold text-slate-800">
                     {lang === 'ar'
@@ -846,7 +921,7 @@ export const AdminSuite: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setParsedExcel(null)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-600 cursor-pointer"
                     >
                       {tr('cancel', lang)}
                     </button>
@@ -854,7 +929,7 @@ export const AdminSuite: React.FC = () => {
                       type="button"
                       disabled={importingExcel || parsedExcel.validRows.length === 0}
                       onClick={() => void handleConfirmUpsertStudents()}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                      className="px-4 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
                     >
                       {importingExcel
                         ? tr('loading', lang)
@@ -878,7 +953,7 @@ export const AdminSuite: React.FC = () => {
           </section>
 
           {/* Full Student CRUD Table */}
-          <section className="meis-glass rounded-2xl p-5 space-y-4">
+          <section className="meis-card rounded-3xl p-5 sm:p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-base font-bold text-slate-900">
                 {lang === 'ar' ? 'قائمة الطلاب المسجلين' : 'Students Directory'} ({filteredStudents.length})
@@ -894,7 +969,7 @@ export const AdminSuite: React.FC = () => {
                     class_section_id: classSections[0]?.id || '',
                   })
                 }
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{lang === 'ar' ? 'إضافة طالب' : 'Add Student'}</span>
@@ -907,12 +982,12 @@ export const AdminSuite: React.FC = () => {
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
                 placeholder={lang === 'ar' ? 'بحث بالاسم أو الإقامة...' : 'Search name or Iqama...'}
-                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               />
               <select
                 value={studentGradeFilter}
                 onChange={(e) => setStudentGradeFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="">{lang === 'ar' ? 'جميع الصفوف' : 'All Grades'}</option>
                 {grades.map((g) => (
@@ -924,7 +999,7 @@ export const AdminSuite: React.FC = () => {
               <select
                 value={studentSectionFilter}
                 onChange={(e) => setStudentSectionFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm"
+                className="px-4 py-2.5 rounded-full border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
               >
                 <option value="">{lang === 'ar' ? 'جميع الشعب' : 'All Sections'}</option>
                 {sections.map((s) => (
@@ -938,50 +1013,50 @@ export const AdminSuite: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs text-slate-500">
-                    <th className="py-2 px-3 text-start font-semibold">ID / Iqama</th>
-                    <th className="py-2 px-3 text-start font-semibold">
+                  <tr className="border-b border-slate-200/80 text-xs text-slate-500">
+                    <th className="py-2.5 px-3 text-start font-semibold">ID / Iqama</th>
+                    <th className="py-2.5 px-3 text-start font-semibold">
                       {lang === 'ar' ? 'الاسم العربي' : 'Arabic Name'}
                     </th>
-                    <th className="py-2 px-3 text-start font-semibold">
+                    <th className="py-2.5 px-3 text-start font-semibold">
                       {lang === 'ar' ? 'الاسم الإنجليزي' : 'English Name'}
                     </th>
-                    <th className="py-2 px-3 text-start font-semibold">
+                    <th className="py-2.5 px-3 text-start font-semibold">
                       {lang === 'ar' ? 'الفصل' : 'Class'}
                     </th>
-                    <th className="py-2 px-3 text-start font-semibold">
+                    <th className="py-2.5 px-3 text-start font-semibold">
                       {lang === 'ar' ? 'جوال الأب' : 'Father Mobile'}
                     </th>
-                    <th className="py-2 px-3 text-end font-semibold" />
+                    <th className="py-2.5 px-3 text-end font-semibold" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredStudents.map((st) => (
-                    <tr key={st.id} className="hover:bg-slate-50/70">
-                      <td className="py-2 px-3 font-mono text-xs">{st.iqama_id}</td>
-                      <td className="py-2 px-3">{st.name_ar}</td>
-                      <td className="py-2 px-3" dir="ltr">
+                    <tr key={st.id} className="hover:bg-white/60 transition-colors">
+                      <td className="py-2.5 px-3 font-mono text-xs">{st.iqama_id}</td>
+                      <td className="py-2.5 px-3">{st.name_ar}</td>
+                      <td className="py-2.5 px-3" dir="ltr">
                         {st.name_en}
                       </td>
-                      <td className="py-2 px-3 text-xs">
+                      <td className="py-2.5 px-3 text-xs">
                         {getLocalizedDisplayName(classMap.get(st.class_section_id), lang)}
                       </td>
-                      <td className="py-2 px-3 font-mono text-xs" dir="ltr">
+                      <td className="py-2.5 px-3 font-mono text-xs" dir="ltr">
                         {st.father_mobile}
                       </td>
-                      <td className="py-2 px-3 text-end">
+                      <td className="py-2.5 px-3 text-end">
                         <div className="inline-flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => setStudentModal(st)}
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer"
+                            className="p-2 rounded-full border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => void handleDeleteStudent(st.id)}
-                            className="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
+                            className="p-2 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -998,8 +1073,8 @@ export const AdminSuite: React.FC = () => {
 
       {/* ==================== TAB 3: MASTER DATA & SETTINGS ==================== */}
       {tab === 'master' && (
-        <div className="meis-glass rounded-2xl p-5 space-y-5">
-          <div className="flex flex-wrap gap-1.5 pb-4 border-b border-slate-200">
+        <div className="meis-card rounded-3xl p-5 sm:p-6 space-y-5">
+          <div className="flex flex-wrap gap-1.5 pb-4 border-b border-slate-200/70">
             {(
               [
                 ['settings', lang === 'ar' ? 'إعدادات المدرسة' : 'School Settings'],
@@ -1017,10 +1092,10 @@ export const AdminSuite: React.FC = () => {
                 key={key}
                 type="button"
                 onClick={() => setMasterSub(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors ${
                   masterSub === key
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'meis-pill-dark shadow-xs'
+                    : 'bg-white/80 text-slate-700 border border-slate-200/70 hover:bg-white'
                 }`}
               >
                 {label}
@@ -1031,7 +1106,7 @@ export const AdminSuite: React.FC = () => {
           {masterSub === 'settings' ? (
             <form onSubmit={handleSaveSettings} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   School Name (English)
                 </label>
                 <input
@@ -1039,22 +1114,22 @@ export const AdminSuite: React.FC = () => {
                   dir="ltr"
                   value={setNameEn}
                   onChange={(e) => setSetNameEn(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   اسم المدرسة (عربي)
                 </label>
                 <input
                   type="text"
                   value={setNameAr}
                   onChange={(e) => setSetNameAr(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Allowed Email Domain
                 </label>
                 <input
@@ -1062,11 +1137,11 @@ export const AdminSuite: React.FC = () => {
                   dir="ltr"
                   value={setDomain}
                   onChange={(e) => setSetDomain(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-mono"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   School Logo URL
                 </label>
                 <input
@@ -1074,29 +1149,29 @@ export const AdminSuite: React.FC = () => {
                   dir="ltr"
                   value={setLogoUrl}
                   onChange={(e) => setSetLogoUrl(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   {lang === 'ar' ? 'حد الانتظار الشهري للمعلم' : 'Max Monthly Substitutions'}
                 </label>
                 <input
                   type="number"
                   value={setMaxSubs}
                   onChange={(e) => setSetMaxSubs(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   {lang === 'ar' ? 'حد التنبيه السلوكي' : 'High Behavior Alert Threshold'}
                 </label>
                 <input
                   type="number"
                   value={setThreshold}
                   onChange={(e) => setSetThreshold(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/90 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                 />
               </div>
               <div className="sm:col-span-2 flex items-center justify-between pt-2">
@@ -1107,7 +1182,7 @@ export const AdminSuite: React.FC = () => {
                 )}
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold cursor-pointer"
+                  className="px-6 py-2.5 rounded-full meis-pill-dark text-sm font-semibold cursor-pointer shadow-sm"
                 >
                   {tr('save', lang)}
                 </button>
@@ -1116,7 +1191,7 @@ export const AdminSuite: React.FC = () => {
           ) : (
             <>
               {/* Quick Add Bar */}
-              <form onSubmit={handleAddMasterRow} className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <form onSubmit={handleAddMasterRow} className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80">
                 {masterSub !== 'class_sections' && (
                   <>
                     <input
@@ -1125,7 +1200,7 @@ export const AdminSuite: React.FC = () => {
                       value={newNameAr}
                       onChange={(e) => setNewNameAr(e.target.value)}
                       placeholder={lang === 'ar' ? 'الاسم العربي' : 'Arabic Name'}
-                      className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs"
+                      className="px-3.5 py-2 rounded-2xl border border-slate-200/80 bg-white text-xs"
                     />
                     <input
                       type="text"
@@ -1134,7 +1209,7 @@ export const AdminSuite: React.FC = () => {
                       value={newNameEn}
                       onChange={(e) => setNewNameEn(e.target.value)}
                       placeholder="English Name"
-                      className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs"
+                      className="px-3.5 py-2 rounded-2xl border border-slate-200/80 bg-white text-xs"
                     />
                   </>
                 )}
@@ -1160,7 +1235,7 @@ export const AdminSuite: React.FC = () => {
                             ? 'Period # or End HH:MM:SS'
                             : 'Code'
                     }
-                    className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs"
+                    className="px-3.5 py-2 rounded-2xl border border-slate-200/80 bg-white text-xs"
                   />
                 )}
 
@@ -1170,7 +1245,7 @@ export const AdminSuite: React.FC = () => {
                   <select
                     value={newExtra1}
                     onChange={(e) => setNewExtra1(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs"
+                    className="px-3.5 py-2 rounded-2xl border border-slate-200/80 bg-white text-xs"
                   >
                     {masterSub === 'class_sections'
                       ? grades.map((g) => (
@@ -1190,7 +1265,7 @@ export const AdminSuite: React.FC = () => {
                   <select
                     value={newExtra2}
                     onChange={(e) => setNewExtra2(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs"
+                    className="px-3.5 py-2 rounded-2xl border border-slate-200/80 bg-white text-xs"
                   >
                     {sections.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1208,7 +1283,7 @@ export const AdminSuite: React.FC = () => {
                       value={newExtra2}
                       onChange={(e) => setNewExtra2(e.target.value)}
                       placeholder="Start 07:45:00"
-                      className="px-2.5 py-2 rounded-lg border border-slate-200 bg-white text-xs w-full"
+                      className="px-3 py-2 rounded-2xl border border-slate-200/80 bg-white text-xs w-full"
                     />
                     <label className="inline-flex items-center gap-1 text-xs shrink-0">
                       <input
@@ -1223,7 +1298,7 @@ export const AdminSuite: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer whitespace-nowrap"
                 >
                   + {tr('add', lang)}
                 </button>
@@ -1319,14 +1394,14 @@ export const AdminSuite: React.FC = () => {
 
       {/* Edit Staff User Modal */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-2xl w-full p-6 sm:p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
               <h3 className="text-base font-bold text-slate-900">{editingUser.email}</h3>
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1339,7 +1414,7 @@ export const AdminSuite: React.FC = () => {
                   value={editUserNameAr}
                   onChange={(e) => setEditUserNameAr(e.target.value)}
                   placeholder="Arabic Name"
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
                 />
                 <input
                   type="text"
@@ -1348,7 +1423,7 @@ export const AdminSuite: React.FC = () => {
                   value={editUserNameEn}
                   onChange={(e) => setEditUserNameEn(e.target.value)}
                   placeholder="English Name"
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
                 />
               </div>
 
@@ -1372,9 +1447,9 @@ export const AdminSuite: React.FC = () => {
                               : [...prev, r]
                           )
                         }
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
                           checked
-                            ? 'bg-slate-900 text-white border-slate-900'
+                            ? 'meis-pill-dark border-transparent'
                             : 'bg-white text-slate-700 border-slate-200'
                         }`}
                       >
@@ -1389,7 +1464,7 @@ export const AdminSuite: React.FC = () => {
                 <select
                   value={editUserSubject}
                   onChange={(e) => setEditUserSubject(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm bg-white"
                 >
                   <option value="">{lang === 'ar' ? 'بدون مادة محددة' : 'No Primary Subject'}</option>
                   {subjects.map((s) => (
@@ -1401,7 +1476,7 @@ export const AdminSuite: React.FC = () => {
                 <select
                   value={editUserDivision}
                   onChange={(e) => setEditUserDivision(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm bg-white"
                 >
                   <option value="">{lang === 'ar' ? 'جميع المراحل' : 'No Division Lock'}</option>
                   {divisions.map((d) => (
@@ -1419,16 +1494,16 @@ export const AdminSuite: React.FC = () => {
                       ? 'الفصول المسندة (تحدد الصفوف والطلاب الظاهرين للمعلم / المشرف)'
                       : 'Assigned Class Sections (controls visible grades & students for Teacher/Supervisor)'}
                   </p>
-                  <span className="text-xs font-semibold text-emerald-700 tabular-nums">
+                  <span className="px-2.5 py-0.5 rounded-full meis-accent-pill text-xs font-semibold tabular-nums">
                     {editUserClasses.length} {lang === 'ar' ? 'محدد' : 'selected'}
                   </span>
                 </div>
-                <div className="max-h-56 overflow-y-auto space-y-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="max-h-56 overflow-y-auto space-y-2.5 p-3 rounded-2xl bg-slate-50/90 border border-slate-200/80">
                   {groupedClassSections.map(({ grade, items }) => {
                     const itemIds = items.map((i) => i.id);
                     const allSelected = itemIds.every((id) => editUserClasses.includes(id));
                     return (
-                      <div key={grade.id} className="p-2.5 rounded-lg bg-white border border-slate-200/80">
+                      <div key={grade.id} className="p-3 rounded-2xl bg-white border border-slate-200/70">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-slate-800">
                             {getLocalizedName(grade, lang)}
@@ -1442,7 +1517,7 @@ export const AdminSuite: React.FC = () => {
                                   : Array.from(new Set([...prev, ...itemIds]))
                               )
                             }
-                            className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                            className="text-[11px] font-semibold meis-accent-text hover:underline cursor-pointer"
                           >
                             {allSelected
                               ? lang === 'ar'
@@ -1467,9 +1542,9 @@ export const AdminSuite: React.FC = () => {
                                       : [...prev, cs.id]
                                   )
                                 }
-                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
                                   active
-                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    ? 'meis-accent-solid border-transparent'
                                     : 'bg-white text-slate-700 border-slate-200'
                                 }`}
                               >
@@ -1485,7 +1560,7 @@ export const AdminSuite: React.FC = () => {
               </div>
 
               {editUserError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                <div className="px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
                   {editUserError}
                 </div>
               )}
@@ -1495,14 +1570,14 @@ export const AdminSuite: React.FC = () => {
                   type="button"
                   disabled={editUserSaving}
                   onClick={() => setEditingUser(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+                  className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
                 >
                   {tr('cancel', lang)}
                 </button>
                 <button
                   type="submit"
                   disabled={editUserSaving}
-                  className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
+                  className="px-5 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer disabled:opacity-60"
                 >
                   {editUserSaving ? tr('loading', lang) : tr('save', lang)}
                 </button>
@@ -1514,16 +1589,16 @@ export const AdminSuite: React.FC = () => {
 
       {/* Create Dummy Test Account Modal */}
       {dummyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-2xl w-full p-6 sm:p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
               <h3 className="text-base font-bold text-slate-900">
                 {lang === 'ar' ? 'إنشاء حساب اختبار تجريبي (Dummy)' : 'Create Dummy Test Account'}
               </h3>
               <button
                 type="button"
                 onClick={() => setDummyModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1537,7 +1612,7 @@ export const AdminSuite: React.FC = () => {
                   value={dummyEmail}
                   onChange={(e) => setDummyEmail(e.target.value)}
                   placeholder="test.teacher@meis.sch.sa"
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
                 />
                 <input
                   type="text"
@@ -1546,7 +1621,7 @@ export const AdminSuite: React.FC = () => {
                   value={dummyPassword}
                   onChange={(e) => setDummyPassword(e.target.value)}
                   placeholder="Dummy Password"
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
                 />
                 <input
                   type="text"
@@ -1554,7 +1629,7 @@ export const AdminSuite: React.FC = () => {
                   value={dummyNameAr}
                   onChange={(e) => setDummyNameAr(e.target.value)}
                   placeholder={lang === 'ar' ? 'الاسم العربي' : 'Arabic Name'}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
                 />
                 <input
                   type="text"
@@ -1563,7 +1638,7 @@ export const AdminSuite: React.FC = () => {
                   value={dummyNameEn}
                   onChange={(e) => setDummyNameEn(e.target.value)}
                   placeholder="English Name"
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
                 />
               </div>
 
@@ -1587,9 +1662,9 @@ export const AdminSuite: React.FC = () => {
                               : [...prev, r]
                           )
                         }
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
                           active
-                            ? 'bg-slate-900 text-white border-slate-900'
+                            ? 'meis-pill-dark border-transparent'
                             : 'bg-white text-slate-700 border-slate-200'
                         }`}
                       >
@@ -1604,7 +1679,7 @@ export const AdminSuite: React.FC = () => {
                 <select
                   value={dummySubject}
                   onChange={(e) => setDummySubject(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm bg-white"
                 >
                   <option value="">{lang === 'ar' ? 'المادة (للمعلم)' : 'Primary Subject'}</option>
                   {subjects.map((s) => (
@@ -1616,7 +1691,7 @@ export const AdminSuite: React.FC = () => {
                 <select
                   value={dummyDivision}
                   onChange={(e) => setDummyDivision(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm bg-white"
                 >
                   <option value="">{lang === 'ar' ? 'المرحلة' : 'Division'}</option>
                   {divisions.map((d) => (
@@ -1627,12 +1702,12 @@ export const AdminSuite: React.FC = () => {
                 </select>
               </div>
 
-              <div className="max-h-48 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="max-h-48 overflow-y-auto space-y-2 p-3 rounded-2xl bg-slate-50/90 border border-slate-200/80">
                 {groupedClassSections.map(({ grade, items }) => {
                   const itemIds = items.map((i) => i.id);
                   const allSelected = itemIds.every((id) => dummyClasses.includes(id));
                   return (
-                    <div key={grade.id} className="p-2 rounded-lg bg-white border border-slate-200/80">
+                    <div key={grade.id} className="p-2.5 rounded-2xl bg-white border border-slate-200/70">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-bold text-slate-800">
                           {getLocalizedName(grade, lang)}
@@ -1646,7 +1721,7 @@ export const AdminSuite: React.FC = () => {
                                 : Array.from(new Set([...prev, ...itemIds]))
                             )
                           }
-                          className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                          className="text-[11px] font-semibold meis-accent-text hover:underline cursor-pointer"
                         >
                           {allSelected
                             ? lang === 'ar'
@@ -1671,9 +1746,9 @@ export const AdminSuite: React.FC = () => {
                                     : [...prev, cs.id]
                                 )
                               }
-                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                              className={`px-3 py-1 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
                                 active
-                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  ? 'meis-accent-solid border-transparent'
                                   : 'bg-white text-slate-700 border-slate-200'
                               }`}
                             >
@@ -1688,7 +1763,7 @@ export const AdminSuite: React.FC = () => {
               </div>
 
               {dummyError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                <div className="px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
                   {dummyError}
                 </div>
               )}
@@ -1698,14 +1773,14 @@ export const AdminSuite: React.FC = () => {
                   type="button"
                   disabled={dummySaving}
                   onClick={() => setDummyModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+                  className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
                 >
                   {tr('cancel', lang)}
                 </button>
                 <button
                   type="submit"
                   disabled={dummySaving}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
+                  className="px-5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
                 >
                   <Check className="w-3.5 h-3.5 inline me-1" />
                   {dummySaving
@@ -1722,8 +1797,8 @@ export const AdminSuite: React.FC = () => {
 
       {/* Confirm Complete Delete User Modal */}
       {deletingUser && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-md w-full p-6 sm:p-7 shadow-2xl space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-red-700">
@@ -1735,7 +1810,7 @@ export const AdminSuite: React.FC = () => {
                 type="button"
                 aria-label="Close delete confirmation"
                 onClick={() => setDeletingUser(null)}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1752,7 +1827,7 @@ export const AdminSuite: React.FC = () => {
                 type="button"
                 disabled={deletingUserLoading}
                 onClick={() => setDeletingUser(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+                className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
               >
                 {tr('cancel', lang)}
               </button>
@@ -1760,7 +1835,7 @@ export const AdminSuite: React.FC = () => {
                 type="button"
                 disabled={deletingUserLoading}
                 onClick={() => void handleDeleteUser()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-60"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>
@@ -1778,8 +1853,8 @@ export const AdminSuite: React.FC = () => {
 
       {/* Add/Edit Student Modal */}
       {studentModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-[2rem] border border-white max-w-lg w-full p-6 sm:p-7 shadow-2xl">
             <h3 className="text-base font-bold text-slate-900 mb-4">
               {studentModal.id
                 ? lang === 'ar'
@@ -1797,7 +1872,7 @@ export const AdminSuite: React.FC = () => {
                 value={studentModal.iqama_id || ''}
                 onChange={(e) => setStudentModal({ ...studentModal, iqama_id: e.target.value })}
                 placeholder="ID / Iqama"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
               />
               <input
                 type="text"
@@ -1805,7 +1880,7 @@ export const AdminSuite: React.FC = () => {
                 value={studentModal.name_ar || ''}
                 onChange={(e) => setStudentModal({ ...studentModal, name_ar: e.target.value })}
                 placeholder={lang === 'ar' ? 'الاسم العربي' : 'Arabic Name'}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
               />
               <input
                 type="text"
@@ -1814,7 +1889,7 @@ export const AdminSuite: React.FC = () => {
                 value={studentModal.name_en || ''}
                 onChange={(e) => setStudentModal({ ...studentModal, name_en: e.target.value })}
                 placeholder="English Name"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
               />
               <input
                 type="text"
@@ -1825,7 +1900,7 @@ export const AdminSuite: React.FC = () => {
                   setStudentModal({ ...studentModal, father_mobile: e.target.value })
                 }
                 placeholder="Father Mobile (9665...)"
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm"
               />
               <select
                 required
@@ -1833,7 +1908,7 @@ export const AdminSuite: React.FC = () => {
                 onChange={(e) =>
                   setStudentModal({ ...studentModal, class_section_id: e.target.value })
                 }
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white"
+                className="w-full px-4 py-2.5 rounded-2xl border border-slate-200/80 text-sm bg-white"
               >
                 {classSections.map((cs) => (
                   <option key={cs.id} value={cs.id}>
@@ -1846,13 +1921,13 @@ export const AdminSuite: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setStudentModal(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+                  className="px-4 py-2 rounded-full border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
                 >
                   {tr('cancel', lang)}
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer"
+                  className="px-5 py-2 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer"
                 >
                   {tr('save', lang)}
                 </button>
@@ -1878,7 +1953,7 @@ const MasterRow: React.FC<{ title: string; meta: string; onDelete: () => void }>
     <button
       type="button"
       onClick={onDelete}
-      className="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
+      className="p-2 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer"
     >
       <Trash2 className="w-3.5 h-3.5" />
     </button>

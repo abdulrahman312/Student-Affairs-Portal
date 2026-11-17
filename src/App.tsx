@@ -34,8 +34,8 @@ const PortalRouter: React.FC = () => {
   if (authLoading || (masterLoading && (!userProfile || !userProfile.is_onboarded))) {
     return (
       <div className="min-h-screen meis-mesh-bg flex items-center justify-center p-6">
-        <div className="meis-glass rounded-2xl px-8 py-6 text-center">
-          <div className="w-8 h-8 rounded-full border-2 border-slate-900 border-t-transparent animate-spin mx-auto mb-3" />
+        <div className="meis-card rounded-3xl px-9 py-7 text-center">
+          <div className="w-9 h-9 rounded-full border-[2.5px] border-slate-900 border-t-transparent animate-spin mx-auto mb-3.5" />
           <p className="text-sm font-semibold text-slate-700">
             {lang === 'ar'
               ? 'جارٍ تحميل بوابة مدارس الشرق الأوسط العالمية...'
