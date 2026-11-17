@@ -11,9 +11,7 @@ import {
   Clock,
   FileDown,
   FileSpreadsheet,
-  Megaphone,
   MessageCircle,
-  Plus,
   Users,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -21,14 +19,13 @@ import { supabase } from '../lib/supabase';
 import type {
   BehaviorLog,
   DutyAssignment,
-  NoticePriority,
   PerformanceComment,
   PerformanceRequest,
   Substitution,
   TeacherAbsence,
   TimetableSlot,
 } from '../types/database';
-import { DAY_NAMES, getLocalizedDisplayName, getLocalizedName, getLocalizedNotice, ROLE_LABELS, tr } from '../utils/i18n';
+import { DAY_NAMES, getLocalizedDisplayName, getLocalizedName, ROLE_LABELS, tr } from '../utils/i18n';
 import { exportBehaviorReportPdf } from '../utils/pdfExport';
 import { getActiveTimeslotLabel, getIsoWeekdayFromDateStr, getRiyadhParts, getSchoolWeekBounds } from '../utils/riyadhTime';
 import {
@@ -39,6 +36,7 @@ import {
   isDateInRange,
 } from '../utils/schoolRules';
 import type { NavTab } from './LayoutShell';
+import { ActiveNoticeBanner } from './NoticeBoardSection';
 import { ProfileSettingsModal } from './ProfileSettingsModal';
 
 interface DashboardHomeProps {
@@ -76,7 +74,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
 
   const [openAccordion, setOpenAccordion] = useState<'duty' | 'classes' | 'actions' | null>('duty');
   const [ringMode, setRingMode] = useState<'quota' | 'bell'>('quota');
-  const [scheduleTab, setScheduleTab] = useState<'grid' | 'bell'>('grid');
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [exportingStudentId, setExportingStudentId] = useState<string | null>(null);
 
@@ -407,25 +404,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (ringDisplayPct / 100) * circumference;
 
-  const priorityPillStyle: Record<NoticePriority, string> = {
-    urgent: 'bg-red-100 text-red-800 border-red-200',
-    important: 'bg-amber-100 text-amber-800 border-amber-200',
-    normal: 'meis-accent-pill',
-  };
-
-  const priorityLabel: Record<NoticePriority, { ar: string; en: string }> = {
-    urgent: { ar: 'عاجل', en: 'Urgent' },
-    important: { ar: 'مهم', en: 'Important' },
-    normal: { ar: 'عام', en: 'Normal' },
-  };
-
   return (
     <div className="space-y-6">
-      {/* ==================== 1. WELCOME & TOP KPI METRIC STRIP ==================== */}
+      {/* ==================== 1. WELCOME, TOP NOTICE BOARD & KPI METRIC STRIP ==================== */}
       <section className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-slate-900 text-balance">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+          <div className="lg:col-span-5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 text-balance">
               {lang === 'ar'
                 ? `مرحباً، ${getLocalizedName(userProfile, lang)}`
                 : `Welcome in, ${getLocalizedName(userProfile, lang)}`}
@@ -437,6 +422,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
                 {riyadhToday}
               </span>
             </p>
+          </div>
+
+          {/* Active Notice Board prominently positioned at the top */}
+          <div className="lg:col-span-7">
+            <ActiveNoticeBanner
+              onOpenManager={canManageNotices ? () => onNavigate('notices') : undefined}
+            />
           </div>
         </div>
 
@@ -1159,9 +1151,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* ==================== 3. BOTTOM SCHEDULE & NOTICE BOARD ROW ==================== */}
+      {/* ==================== 3. BOTTOM SCHEDULE & LIVE BELL TIMES ROW ==================== */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* Weekly Timetable / Duty & Bell Timeline Grid */}
+        {/* Weekly Timetable / Duty & Absence Timeline Grid */}
         <div className="lg:col-span-7 meis-card rounded-3xl p-5 flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200/70">
             <div>
@@ -1172,267 +1164,203 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({ onNavigate }) => {
                     : 'Weekly Teaching & Duty Timeline'
                   : lang === 'ar'
                     ? 'الجدول الزمني الأسبوعي والمناوبات'
-                    : 'Weekly Schedule & Bell Timeline'}
+                    : 'Weekly Schedule & Duty Timeline'}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5 tabular-nums font-mono">
                 {weekBounds.weekStart} → {weekBounds.weekEndThu}
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="inline-flex p-1 rounded-full bg-slate-100/90 border border-slate-200/70">
-                <button
-                  type="button"
-                  onClick={() => setScheduleTab('grid')}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-                    scheduleTab === 'grid'
-                      ? 'meis-pill-dark'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {activeRole === 'teacher'
-                    ? lang === 'ar'
-                      ? 'الجدول'
-                      : 'Timetable'
-                    : lang === 'ar'
-                      ? 'الأسبوع'
-                      : 'Week View'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScheduleTab('bell')}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors ${
-                    scheduleTab === 'bell'
-                      ? 'meis-pill-dark'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {lang === 'ar' ? 'أوقات الجرس' : 'Bell Times'}
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('timetable')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/90 border border-slate-200/80 hover:bg-white text-xs font-semibold text-slate-800 cursor-pointer"
+            >
+              <span>{lang === 'ar' ? 'فتح الجدول' : 'Open Timetable'}</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          {scheduleTab === 'grid' ? (
-            activeRole === 'teacher' ? (
-              <div className="mt-4 overflow-x-auto flex-1">
-                <div className="min-w-[540px] grid grid-cols-6 gap-2 text-xs">
-                  <div className="py-2 text-slate-400 font-semibold">
-                    {lang === 'ar' ? 'الحصة' : 'Period'}
+          {activeRole === 'teacher' ? (
+            <div className="mt-4 overflow-x-auto flex-1">
+              <div className="min-w-[540px] grid grid-cols-6 gap-2 text-xs">
+                <div className="py-2 text-slate-400 font-semibold">
+                  {lang === 'ar' ? 'الحصة' : 'Period'}
+                </div>
+                {WEEK_DAYS.map((d) => (
+                  <div
+                    key={d}
+                    className={`py-2 text-center font-bold rounded-full ${
+                      d === riyadhParts.weekdayIndex
+                        ? 'meis-accent-pill'
+                        : 'text-slate-700'
+                    }`}
+                  >
+                    {DAY_NAMES[d][lang]}
                   </div>
-                  {WEEK_DAYS.map((d) => (
+                ))}
+
+                {[1, 2, 3, 4, 5, 6, 7].map((period) => (
+                  <React.Fragment key={period}>
+                    <div className="py-2 font-mono font-semibold text-slate-500 flex items-center">
+                      {lang === 'ar' ? `ح ${period}` : `P${period}`}
+                    </div>
+                    {WEEK_DAYS.map((day) => {
+                      const slot = myTimetableMap.get(`${day}-${period}`);
+                      const cs = slot ? classMap.get(slot.class_section_id) : undefined;
+                      return (
+                        <div key={day} className="flex items-center justify-center py-1">
+                          {slot ? (
+                            <span
+                              title={getLocalizedName(subMap.get(slot.subject_id), lang)}
+                              className="w-full text-center px-2 py-1.5 rounded-full meis-pill-dark text-[11px] font-semibold truncate"
+                            >
+                              {getLocalizedDisplayName(cs, lang)}
+                            </span>
+                          ) : (
+                            <span className="w-full text-center py-1.5 rounded-full bg-slate-100/70 text-slate-300 text-[11px]">
+                              —
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Leadership / Supervisor / Admin Horizontal Week Timeline */
+            <div className="mt-4 space-y-3 flex-1">
+              <div className="grid grid-cols-5 gap-2 text-center">
+                {WEEK_DAYS.map((d) => {
+                  const isToday = d === riyadhParts.weekdayIndex;
+                  return (
                     <div
                       key={d}
-                      className={`py-2 text-center font-bold rounded-full ${
-                        d === riyadhParts.weekdayIndex
+                      className={`py-2 px-2 rounded-2xl border text-xs font-bold ${
+                        isToday
                           ? 'meis-accent-pill'
-                          : 'text-slate-700'
+                          : 'bg-white/70 border-slate-200/70 text-slate-700'
                       }`}
                     >
                       {DAY_NAMES[d][lang]}
                     </div>
-                  ))}
-
-                  {[1, 2, 3, 4, 5, 6, 7].map((period) => (
-                    <React.Fragment key={period}>
-                      <div className="py-2 font-mono font-semibold text-slate-500 flex items-center">
-                        {lang === 'ar' ? `ح ${period}` : `P${period}`}
-                      </div>
-                      {WEEK_DAYS.map((day) => {
-                        const slot = myTimetableMap.get(`${day}-${period}`);
-                        const cs = slot ? classMap.get(slot.class_section_id) : undefined;
-                        return (
-                          <div key={day} className="flex items-center justify-center py-1">
-                            {slot ? (
-                              <span
-                                title={getLocalizedName(subMap.get(slot.subject_id), lang)}
-                                className="w-full text-center px-2 py-1.5 rounded-full meis-pill-dark text-[11px] font-semibold truncate"
-                              >
-                                {getLocalizedDisplayName(cs, lang)}
-                              </span>
-                            ) : (
-                              <span className="w-full text-center py-1.5 rounded-full bg-slate-100/70 text-slate-300 text-[11px]">
-                                —
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            ) : (
-              /* Leadership / Supervisor / Admin Horizontal Week Timeline */
-              <div className="mt-4 space-y-3 flex-1">
-                <div className="grid grid-cols-5 gap-2 text-center">
-                  {WEEK_DAYS.map((d) => {
-                    const isToday = d === riyadhParts.weekdayIndex;
-                    return (
-                      <div
-                        key={d}
-                        className={`py-2 px-2 rounded-2xl border text-xs font-bold ${
-                          isToday
-                            ? 'meis-accent-pill'
-                            : 'bg-white/70 border-slate-200/70 text-slate-700'
-                        }`}
-                      >
-                        {DAY_NAMES[d][lang]}
-                      </div>
-                    );
-                  })}
-                </div>
 
-                {/* Duty & Absence Pills across Week */}
-                <div className="space-y-2 pt-1">
-                  {scopedAbsencesToday.length > 0 && (
-                    <div className="p-3 rounded-2xl bg-red-50/80 border border-red-200/80 flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-red-900">
-                        {lang === 'ar' ? 'غياب اليوم:' : 'Absent Today:'}
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {scopedAbsencesToday.map((a) => (
-                          <span
-                            key={a.id}
-                            className="px-3 py-1 rounded-full bg-white border border-red-200 text-xs font-semibold text-red-700"
-                          >
-                            {getLocalizedName(profMap.get(a.teacher_id), lang)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {scopedDutiesThisWeek.slice(0, 4).map((d) => (
-                    <div
-                      key={d.id}
-                      className="p-3 rounded-2xl bg-white/85 border border-slate-200/70 flex flex-wrap items-center justify-between gap-2"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="px-3 py-1 rounded-full meis-pill-dark text-[11px] font-semibold shrink-0">
-                          {getLocalizedName(dutyMap.get(d.duty_type_id), lang)}
-                        </span>
-                        <span className="text-xs font-bold text-slate-900 truncate">
-                          {getLocalizedName(profMap.get(d.teacher_id), lang)}
-                        </span>
-                      </div>
-                      <span className="text-xs text-slate-500 font-mono tabular-nums">
-                        {d.location_text} · {d.start_date}
-                      </span>
-                    </div>
-                  ))}
-
-                  {scopedAbsencesToday.length === 0 && scopedDutiesThisWeek.length === 0 && (
-                    <p className="text-xs text-slate-500 py-8 text-center">
-                      {lang === 'ar'
-                        ? 'لا توجد غيابات اليوم أو مناوبات مجدولة هذا الأسبوع.'
-                        : 'No absences today or duty events scheduled this week.'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )
-          ) : (
-            /* Active Bell Schedule Grid */
-            <div className="mt-4 space-y-4 flex-1">
-              {visibleDivisions.map((div) => {
-                const divSlots = timeslots
-                  .filter((t) => t.division_id === div.id)
-                  .sort((a, b) => a.sort_order - b.sort_order);
-                return (
-                  <div key={div.id} className="space-y-2">
-                    <p className="text-xs font-bold text-slate-800">
-                      {getLocalizedName(div, lang)}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {divSlots.map((slot) => (
-                        <div
-                          key={slot.id}
-                          className={`px-3.5 py-1.5 rounded-full border text-xs flex items-center gap-2 ${
-                            slot.is_break
-                              ? 'bg-amber-50 border-amber-200 text-amber-900'
-                              : 'bg-white/90 border-slate-200/80 text-slate-800'
-                          }`}
+              {/* Duty & Absence Pills across Week */}
+              <div className="space-y-2 pt-1">
+                {scopedAbsencesToday.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-red-50/80 border border-red-200/80 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-red-900">
+                      {lang === 'ar' ? 'غياب اليوم:' : 'Absent Today:'}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {scopedAbsencesToday.map((a) => (
+                        <span
+                          key={a.id}
+                          className="px-3 py-1 rounded-full bg-white border border-red-200 text-xs font-semibold text-red-700"
                         >
-                          <span className="font-semibold">{getLocalizedName(slot, lang)}</span>
-                          <span dir="ltr" className="font-mono tabular-nums text-[11px] text-slate-500">
-                            {slot.start_time.slice(0, 5)}
-                          </span>
-                        </div>
+                          {getLocalizedName(profMap.get(a.teacher_id), lang)}
+                        </span>
                       ))}
                     </div>
                   </div>
-                );
-              })}
+                )}
+
+                {scopedDutiesThisWeek.slice(0, 4).map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-3 rounded-2xl bg-white/85 border border-slate-200/70 flex flex-wrap items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="px-3 py-1 rounded-full meis-pill-dark text-[11px] font-semibold shrink-0">
+                        {getLocalizedName(dutyMap.get(d.duty_type_id), lang)}
+                      </span>
+                      <span className="text-xs font-bold text-slate-900 truncate">
+                        {getLocalizedName(profMap.get(d.teacher_id), lang)}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-500 font-mono tabular-nums">
+                      {d.location_text} · {d.start_date}
+                    </span>
+                  </div>
+                ))}
+
+                {scopedAbsencesToday.length === 0 && scopedDutiesThisWeek.length === 0 && (
+                  <p className="text-xs text-slate-500 py-8 text-center">
+                    {lang === 'ar'
+                      ? 'لا توجد غيابات اليوم أو مناوبات مجدولة هذا الأسبوع.'
+                      : 'No absences today or duty events scheduled this week.'}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Active Notice Board Feed */}
+        {/* Live Division Bell Schedule */}
         <div className="lg:col-span-5 meis-card rounded-3xl p-5 flex flex-col">
           <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-200/70">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-full meis-accent-pill flex items-center justify-center shrink-0">
-                <Megaphone className="w-4 h-4" />
+                <Clock className="w-4 h-4" />
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  {lang === 'ar' ? 'لوحة الإعلانات النشطة' : 'Active Notice Board'}
+                  {lang === 'ar' ? 'جدول الجرس المباشر' : 'Live Division Bell Schedule'}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  {activeNotices.length}{' '}
-                  {lang === 'ar' ? 'إعلان نشط اليوم' : 'scheduled for today'}
+                  {lang === 'ar' ? 'توقيت الرياض (UTC+3)' : 'Asia/Riyadh (UTC+3)'}
                 </p>
               </div>
             </div>
 
-            {canManageNotices && (
-              <button
-                type="button"
-                onClick={() => onNavigate('notices')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full meis-pill-dark text-xs font-semibold cursor-pointer whitespace-nowrap"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{lang === 'ar' ? 'إدارة الإعلانات' : 'Manage'}</span>
-              </button>
-            )}
+            <span className="px-3 py-1 rounded-full meis-pill-dark text-[11px] font-bold whitespace-nowrap">
+              {activeBellLower?.isActive
+                ? activeBellLower.label
+                : activeBellUpper?.label || (lang === 'ar' ? 'خارج الدوام' : 'Off Hours')}
+            </span>
           </div>
 
-          <div className="mt-4 space-y-3 flex-1 max-h-[300px] overflow-y-auto pe-1">
-            {activeNotices.length === 0 ? (
-              <p className="text-xs text-slate-500 py-10 text-center">
-                {lang === 'ar'
-                  ? 'لا توجد إعلانات نشطة لهذا اليوم.'
-                  : 'No active notices scheduled for today.'}
-              </p>
-            ) : (
-              activeNotices.map((n) => {
-                const localized = getLocalizedNotice(n, lang);
-                const div = divisions.find((d) => d.id === n.target_division_id);
-                return (
-                  <div
-                    key={n.id}
-                    className="p-4 rounded-2xl bg-white/85 border border-white shadow-xs space-y-1.5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${priorityPillStyle[n.priority]}`}
-                      >
-                        {priorityLabel[n.priority][lang]}
-                      </span>
-                      <span className="text-[11px] font-mono tabular-nums text-slate-500">
-                        {div ? getLocalizedName(div, lang) : lang === 'ar' ? 'الجميع' : 'All'} ·{' '}
-                        {n.start_date === n.end_date
-                          ? n.start_date
-                          : `${n.start_date} → ${n.end_date}`}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-900">{localized.title}</h3>
-                    <p className="text-xs text-slate-600 leading-relaxed">{localized.content}</p>
+          <div className="mt-4 space-y-4 flex-1 max-h-[300px] overflow-y-auto pe-1">
+            {visibleDivisions.map((div) => {
+              const divSlots = timeslots
+                .filter((t) => t.division_id === div.id)
+                .sort((a, b) => a.sort_order - b.sort_order);
+              const divBell = getActiveTimeslotLabel(timeslots, div.id, now, lang);
+              return (
+                <div key={div.id} className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-slate-800">
+                      {getLocalizedName(div, lang)}
+                    </p>
+                    <span className="text-[11px] font-semibold meis-accent-text">
+                      {divBell.label}
+                    </span>
                   </div>
-                );
-              })
-            )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {divSlots.map((slot) => (
+                      <div
+                        key={slot.id}
+                        className={`px-3 py-1.5 rounded-full border text-xs flex items-center gap-1.5 ${
+                          slot.is_break
+                            ? 'bg-amber-50 border-amber-200 text-amber-900'
+                            : 'bg-white/90 border-slate-200/80 text-slate-800'
+                        }`}
+                      >
+                        <span className="font-semibold">{getLocalizedName(slot, lang)}</span>
+                        <span dir="ltr" className="font-mono tabular-nums text-[11px] text-slate-500">
+                          {slot.start_time.slice(0, 5)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

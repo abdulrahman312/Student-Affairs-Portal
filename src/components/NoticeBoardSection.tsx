@@ -22,6 +22,7 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
     userProfile,
   } = useApp();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [showAll, setShowAll] = useState(false);
 
   const todayRiyadh = useMemo(() => getRiyadhParts(new Date()).dateStr, []);
   const scope = useMemo(
@@ -59,28 +60,37 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
     userProfile?.active_role === 'admin';
 
   if (activeNotices.length === 0) {
-    if (!canPublish) return null;
     return (
-      <div className="meis-card rounded-3xl p-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 text-sm text-slate-600">
-          <Megaphone className="w-4 h-4 text-slate-400 shrink-0" />
-          <span>
-            {lang === 'ar'
-              ? 'لا توجد إعلانات نشطة لهذا اليوم.'
-              : 'No active notices scheduled for today.'}
-          </span>
+      <section
+        aria-label={lang === 'ar' ? 'لوحة الإعلانات النشطة' : 'Active Notice Board'}
+        className="meis-card rounded-3xl px-4 py-3.5 sm:px-5 flex flex-wrap items-center justify-between gap-3"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-full meis-accent-pill flex items-center justify-center shrink-0">
+            <Megaphone className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-900">
+              {lang === 'ar' ? 'لوحة الإعلانات النشطة' : 'Active Notice Board'}
+            </p>
+            <p className="text-xs text-slate-500 truncate">
+              {lang === 'ar'
+                ? 'لا توجد إعلانات نشطة مجدولة لهذا اليوم.'
+                : 'No active notices scheduled for today.'}
+            </p>
+          </div>
         </div>
-        {onOpenManager && (
+        {canPublish && onOpenManager && (
           <button
             type="button"
             onClick={onOpenManager}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full meis-pill-dark text-xs font-semibold whitespace-nowrap cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{lang === 'ar' ? 'نشر إعلان' : 'Publish Notice'}</span>
           </button>
         )}
-      </div>
+      </section>
     );
   }
 
@@ -102,6 +112,12 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
     normal: 'meis-card text-slate-900',
   };
 
+  const priorityPillStyle: Record<NoticePriority, string> = {
+    urgent: 'bg-red-100 text-red-800 border-red-200',
+    important: 'bg-amber-100 text-amber-800 border-amber-200',
+    normal: 'meis-accent-pill',
+  };
+
   const priorityLabel: Record<NoticePriority, { ar: string; en: string }> = {
     urgent: { ar: 'عاجل', en: 'Urgent' },
     important: { ar: 'مهم', en: 'Important' },
@@ -111,77 +127,133 @@ export const ActiveNoticeBanner: React.FC<{ onOpenManager?: () => void }> = ({
   return (
     <section
       aria-label={lang === 'ar' ? 'لوحة الإعلانات النشطة' : 'Active Notice Board'}
-      className={`rounded-3xl border p-4 sm:p-5 backdrop-blur-md transition-colors ${priorityStyles[current.priority]}`}
+      className={`rounded-3xl border px-4 py-3.5 sm:px-5 sm:py-4 backdrop-blur-md transition-colors ${priorityStyles[current.priority]}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
-          <div className="p-2.5 rounded-full bg-white/90 border border-white shadow-xs shrink-0">
-            <Megaphone className="w-5 h-5 text-slate-900" />
+          <div className="w-9 h-9 rounded-full bg-white/90 border border-white shadow-xs flex items-center justify-center shrink-0 mt-0.5">
+            <Megaphone className="w-4 h-4 text-slate-900" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold opacity-80 mb-1">
-              <span>{priorityLabel[current.priority][lang]}</span>
-              <span aria-hidden="true">·</span>
-              <span>{divName}</span>
-              <span aria-hidden="true">·</span>
-              <span className="tabular-nums font-mono">
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold mb-1">
+              <span
+                className={`px-2.5 py-0.5 rounded-full border font-bold ${priorityPillStyle[current.priority]}`}
+              >
+                {priorityLabel[current.priority][lang]}
+              </span>
+              <span className="opacity-75">·</span>
+              <span className="opacity-80">{divName}</span>
+              <span className="opacity-75">·</span>
+              <span className="tabular-nums font-mono opacity-80">
                 {current.start_date === current.end_date
                   ? current.start_date
                   : `${current.start_date} → ${current.end_date}`}
               </span>
             </div>
-            <h2 className="text-base font-bold leading-snug">{localized.title}</h2>
-            <p className="text-sm opacity-90 mt-1 leading-relaxed">{localized.content}</p>
+            <h2 className="text-sm sm:text-base font-bold leading-snug">{localized.title}</h2>
+            <p className="text-xs sm:text-sm opacity-90 mt-0.5 leading-relaxed line-clamp-2">
+              {localized.content}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           {activeNotices.length > 1 && (
-            <div className="flex items-center gap-1 bg-white/80 rounded-full p-1 border border-white">
+            <>
+              <div className="flex items-center gap-0.5 bg-white/80 rounded-full p-0.5 border border-white">
+                <button
+                  type="button"
+                  aria-label="Previous notice"
+                  onClick={() =>
+                    setActiveIndex((i) => (i - 1 + activeNotices.length) % activeNotices.length)
+                  }
+                  className="p-1.5 rounded-full hover:bg-white cursor-pointer"
+                >
+                  {lang === 'ar' ? (
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  )}
+                </button>
+                <span className="text-[11px] font-bold px-1.5 tabular-nums">
+                  {safeIdx + 1}/{activeNotices.length}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next notice"
+                  onClick={() => setActiveIndex((i) => (i + 1) % activeNotices.length)}
+                  className="p-1.5 rounded-full hover:bg-white cursor-pointer"
+                >
+                  {lang === 'ar' ? (
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
               <button
                 type="button"
-                aria-label="Previous notice"
-                onClick={() =>
-                  setActiveIndex((i) => (i - 1 + activeNotices.length) % activeNotices.length)
-                }
-                className="p-1.5 rounded-full hover:bg-white cursor-pointer"
+                onClick={() => setShowAll((prev) => !prev)}
+                className="px-3 py-1.5 rounded-full bg-white/85 hover:bg-white border border-white text-[11px] font-semibold text-slate-800 cursor-pointer whitespace-nowrap"
               >
-                {lang === 'ar' ? (
-                  <ChevronRight className="w-4 h-4" />
-                ) : (
-                  <ChevronLeft className="w-4 h-4" />
-                )}
+                {showAll
+                  ? lang === 'ar'
+                    ? 'طي'
+                    : 'Collapse'
+                  : lang === 'ar'
+                    ? `عرض الكل (${activeNotices.length})`
+                    : `All (${activeNotices.length})`}
               </button>
-              <span className="text-xs font-bold px-2 tabular-nums">
-                {safeIdx + 1} / {activeNotices.length}
-              </span>
-              <button
-                type="button"
-                aria-label="Next notice"
-                onClick={() => setActiveIndex((i) => (i + 1) % activeNotices.length)}
-                className="p-1.5 rounded-full hover:bg-white cursor-pointer"
-              >
-                {lang === 'ar' ? (
-                  <ChevronLeft className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-              </button>
-            </div>
+            </>
           )}
 
           {canPublish && onOpenManager && (
             <button
               type="button"
               onClick={onOpenManager}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full meis-pill-dark text-xs font-semibold whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full meis-pill-dark text-xs font-semibold whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{lang === 'ar' ? 'نشر إعلان' : 'Publish Notice'}</span>
+              <span>{lang === 'ar' ? 'إدارة' : 'Manage'}</span>
             </button>
           )}
         </div>
       </div>
+
+      {showAll && activeNotices.length > 1 && (
+        <div className="mt-3 pt-3 border-t border-slate-900/10 grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pe-1">
+          {activeNotices.map((n, idx) => {
+            const loc = getLocalizedNotice(n, lang);
+            const div = divisions.find((d) => d.id === n.target_division_id);
+            return (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => {
+                  setActiveIndex(idx);
+                  setShowAll(false);
+                }}
+                className={`text-start p-3 rounded-2xl bg-white/85 hover:bg-white border transition-colors cursor-pointer space-y-1 ${
+                  idx === safeIdx ? 'border-slate-900/30 shadow-xs' : 'border-white'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span
+                    className={`px-2 py-0.5 rounded-full border font-bold ${priorityPillStyle[n.priority]}`}
+                  >
+                    {priorityLabel[n.priority][lang]}
+                  </span>
+                  <span className="font-mono tabular-nums text-slate-500">
+                    {div ? getLocalizedName(div, lang) : lang === 'ar' ? 'الجميع' : 'All'}
+                  </span>
+                </div>
+                <p className="text-xs font-bold text-slate-900 truncate">{loc.title}</p>
+                <p className="text-[11px] text-slate-600 line-clamp-2">{loc.content}</p>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 };
